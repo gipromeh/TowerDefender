@@ -197,7 +197,7 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
     if(paused||gameOver)return;const delta=dt*speed;
     if(!active){
       if(intermissionLeft>0){
-        intermissionLeft=Math.max(0,intermissionLeft-delta);
+        intermissionLeft=Math.max(0,intermissionLeft-dt);
         const seconds=Math.ceil(intermissionLeft);
         if(seconds!==intermissionShown){intermissionShown=seconds;say('Следующая волна через '+seconds+' сек.');}
         if(intermissionLeft===0)startWave();
