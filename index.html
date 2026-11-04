@@ -19,6 +19,22 @@ html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#17221c;fon
 #gameHud button,#gameHud select{min-height:34px;border:1px solid #b99a68;border-radius:6px;background:#354638;color:#fff4dc;padding:6px 9px;font-weight:600;font-size:12px}
 #gameHud button:disabled{opacity:.45}#gameHud label{align-self:center}
 #startWave[hidden]{display:none}
+#introScreen{position:fixed;z-index:40;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;background:linear-gradient(135deg,#101a17eF,#17251feF),radial-gradient(ellipse at 50% 42%,#526c45,#101a17);color:#f5eedf;text-align:center;backdrop-filter:blur(7px)}
+#introScreen[hidden],#waveCountdown[hidden]{display:none}
+.introCard{width:min(620px,100%);padding:clamp(22px,5vw,42px);border:1px solid #d5b77b99;border-radius:18px;background:linear-gradient(145deg,#26382feF,#142019f5);box-shadow:0 18px 70px #0009}
+.introKicker{font-size:11px;letter-spacing:.28em;text-transform:uppercase;color:#d6b66d}
+.introTitle{margin:12px 0 8px;font-size:clamp(34px,7vw,62px);line-height:1;letter-spacing:.04em;text-shadow:0 4px 18px #0009}
+.introLead{max-width:470px;margin:0 auto 24px;color:#d7d0bd;font-size:15px;line-height:1.55}
+.introRules{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:22px 0 26px;text-align:left}
+.introRule{padding:12px;border:1px solid #c6ad7655;border-radius:10px;background:#ffffff08;font-size:12px;line-height:1.45;color:#e8dfcc}
+.introRule b{display:block;margin-bottom:5px;color:#e7c87d;font-size:13px}
+#enterBattle{min-height:50px;width:min(300px,100%);border:1px solid #f0d18b;border-radius:10px;background:linear-gradient(#b58b42,#78562b);color:#fff8e8;font-size:15px;font-weight:800;letter-spacing:.08em;box-shadow:0 5px 20px #0005;cursor:pointer}
+#enterBattle:active{transform:translateY(1px)}
+#introFoot{margin-top:13px;color:#9eaa9e;font-size:10px;letter-spacing:.06em}
+#waveCountdown{position:fixed;z-index:25;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;background:#07100a40;color:#fff3d2;text-shadow:0 5px 24px #000;backdrop-filter:blur(2px)}
+#countdownValue{font-size:clamp(100px,25vw,220px);font-weight:900;line-height:.9;color:#f3d58c;text-shadow:0 0 35px #d99c3b88,0 8px 30px #000}
+#countdownLabel{margin-top:18px;font-size:clamp(15px,3vw,24px);font-weight:800;letter-spacing:.22em;text-transform:uppercase}
+@media(max-width:560px){.introRules{grid-template-columns:1fr}.introRule{padding:9px}.introCard{max-width:440px}.introLead{font-size:13px}}
 #gameMessage{grid-column:1/-1;min-height:18px;line-height:1.3;color:#f4d99a}
 #contextMenu{position:fixed;z-index:12;left:50%;bottom:max(14px,env(safe-area-inset-bottom));transform:translateX(-50%);width:min(570px,calc(100vw - 24px));padding:12px;color:#f5eedf;background:#17241ff2;border:1px solid #d5b77b99;border-radius:13px;box-shadow:0 8px 30px #0008;backdrop-filter:blur(12px)}
 #contextMenu[hidden]{display:none}
@@ -38,7 +54,7 @@ html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#17221c;fon
 <div id="loading"><div class="message"><strong>Загрузка 3D-сцены…</strong>Инициализация Babylon.js.</div></div>
 <div id="error"><div class="message"><strong id="errorTitle">Ошибка сцены</strong><span id="errorText"></span></div></div>
 <div id="rotate"><div class="message"><strong>↻ Поверните устройство горизонтально</strong><br>Сцена рассчитана на альбомную ориентацию.</div></div>
-<details id="gameHud" aria-label="Панель игры">
+<section id="introScreen" aria-label="Вступление к игре"><div class="introCard"><div class="introKicker">Тактическая оборона</div><h1 class="introTitle">TOWER DEFENDER</h1><p class="introLead">Враги идут к крепости по дороге. Постройте оборону, комбинируйте орудия и не дайте противнику прорваться к воротам.</p><div class="introRules"><div class="introRule"><b>01 · Стройте</b>Нажмите на свободную площадку и выберите тип башни.</div><div class="introRule"><b>02 · Усиливайте</b>Улучшайте башни: растут мощность и сама конструкция.</div><div class="introRule"><b>03 · Защищайте</b>Зарабатывайте золото за уничтоженных врагов и отражённые волны.</div></div><button id="enterBattle" type="button">НАЧАТЬ ОБОРОНУ</button><div id="introFoot">ПЕРВАЯ ВОЛНА НАЧНЁТСЯ ЧЕРЕЗ 3 СЕКУНДЫ</div></div></section>\n<div id="waveCountdown" hidden aria-live="assertive"><div id="countdownValue">3</div><div id="countdownLabel">Первая волна</div></div>\n<details id="gameHud" aria-label="Панель игры">
 <summary><span class="stats"><span>Золото <strong id="goldValue">100</strong></span><span>База <strong id="baseValue">20</strong></span><span>Волна <strong id="waveValue">0</strong></span><span>Убийства <strong id="killsValue">0</strong></span></span></summary>
 <div class="controls">
 <button id="startWave" type="button">Начать осаду</button>
