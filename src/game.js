@@ -17,6 +17,7 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
   const ui={
     gold:$('goldValue'),base:$('baseValue'),wave:$('waveValue'),kills:$('killsValue'),
     start:$('startWave'),pause:$('pauseGame'),speed:$('gameSpeed'),
+    intro:$('introScreen'),introButton:$('enterBattle'),countdown:$('waveCountdown'),countdownValue:$('countdownValue'),countdownLabel:$('countdownLabel'),
     selected:$('selectedPad'),message:$('gameMessage'),
     menu:$('contextMenu'),menuTitle:$('contextTitle'),menuInfo:$('contextInfo'),
     buildButtons:[...document.querySelectorAll('[data-build]')],
@@ -26,7 +27,7 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
   for(let i=1;i<path.length;i++)lengths.push(lengths[i-1]+B.Vector3.Distance(path[i-1],path[i]));
   const pathLength=lengths.at(-1), enemies=[],towers=[],projectiles=[],effects=[];
   let gold=CONFIG.startingGold,baseHealth=CONFIG.baseHealth,wave=0,kills=0;
-  let spawnLeft=0,spawnTimer=0,active=false,paused=false,speed=1,selectedPad=-1,gameOver=false,started=false,intermissionLeft=0,intermissionShown=0;
+  let spawnLeft=0,spawnTimer=0,active=false,paused=false,speed=1,selectedPad=-1,gameOver=false,started=false,intermissionLeft=0,intermissionShown=0,countdownLeft=0,countdownShown=0;
   const materials={},visualAnimations=[];
   function material(name,color,emissive=false,alpha=1){
     const m=new B.StandardMaterial(name,scene);m.diffuseColor=B.Color3.FromHexString(color);
@@ -40,7 +41,7 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
   function say(text){ui.message.textContent=text;}
   function refresh(){
     ui.gold.textContent=gold;ui.base.textContent=baseHealth;ui.wave.textContent=wave;ui.kills.textContent=kills;
-    ui.start.hidden=started;ui.start.disabled=started||gameOver;ui.pause.disabled=!active;ui.pause.textContent=paused?'Продолжить':'Пауза';
+    ui.start.hidden=true;ui.start.disabled=true;ui.pause.disabled=!active;ui.pause.textContent=paused?'Продолжить':'Пауза';
     ui.speed.disabled=!active;ui.selected.textContent=selectedPad<0?'—':String(selectedPad+1);
   }
   function pointAt(distance){
@@ -249,11 +250,11 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
     }
     if(paused||gameOver)return;const delta=dt*speed;
     if(!active){
-      if(intermissionLeft>0){
-        intermissionLeft=Math.max(0,intermissionLeft-dt);
-        const seconds=Math.ceil(intermissionLeft);
-        if(seconds!==intermissionShown){intermissionShown=seconds;say('Следующая волна через '+seconds+' сек.');}
-        if(intermissionLeft===0)startWave();
+      if(countdownLeft>0){
+        countdownLeft=Math.max(0,countdownLeft-dt);
+        const seconds=Math.ceil(countdownLeft);
+        if(seconds!==countdownShown){countdownShown=seconds;ui.countdownValue.textContent=String(seconds||'');}
+        if(countdownLeft===0){hideCountdown();startWave();}
       }
       return;
     }
@@ -301,13 +302,22 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
     for(const effect of [...effects]){effect.life-=delta;if(effect.life<=0){effect.mesh.dispose();effects.splice(effects.indexOf(effect),1);}}
     if(active&&spawnLeft===0&&enemies.length===0){
       active=false;gold+=20+5*wave;hideMenu();
-      intermissionLeft=5;intermissionShown=5;
-      say('Волна '+wave+' отражена. Награда: '+(20+5*wave)+'. Следующая волна через 5 сек.');refresh();
+      intermissionLeft=5;intermissionShown=5;beginCountdown(5,'Следующая волна');
+      say('Волна '+wave+' отражена. Награда: '+(20+5*wave)+'.');refresh();
     }
+  }
+  function showCountdown(seconds,label){
+    countdownLeft=seconds;countdownShown=seconds;ui.countdownValue.textContent=String(seconds);ui.countdownLabel.textContent=label;ui.countdown.hidden=false;
+  }
+  function hideCountdown(){ui.countdown.hidden=true;countdownLeft=0;countdownShown=0;}
+  function beginCountdown(seconds,label){showCountdown(seconds,label);say(label+' через '+seconds+' сек.');}
+  function enterBattle(){
+    if(started||gameOver)return;
+    started=true;ui.intro.hidden=true;beginCountdown(3,'Первая волна');refresh();
   }
   function startWave(){
     if(active||gameOver)return;
-    started=true;intermissionLeft=0;intermissionShown=0;hideMenu();
+    started=true;intermissionLeft=0;intermissionShown=0;hideCountdown();hideMenu();
     wave++;spawnLeft=CONFIG.enemiesPerWave(wave);spawnTimer=0;active=true;paused=false;
     say('Волна '+wave+': противник приближается.');refresh();
   }
@@ -320,11 +330,12 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
   ui.buildButtons.forEach(button=>button.addEventListener('click',()=>build(selectedPad,button.dataset.build)));
   ui.upgrade.addEventListener('click',upgrade);ui.sell.addEventListener('click',sell);
   ui.close.addEventListener('click',hideMenu);
-  ui.start.addEventListener('click',startWave);
+  ui.start.addEventListener('click',enterBattle);
+  ui.introButton.addEventListener('click',enterBattle);
   ui.pause.addEventListener('click',()=>{paused=!paused;refresh();say(paused?'Пауза.':'Волна продолжается.');});
   ui.speed.addEventListener('change',()=>{speed=Number(ui.speed.value)||1;});
   scene.onBeforeRenderObservable.add(()=>update(Math.min(engine.getDeltaTime()/1000,.05)));
   document.addEventListener('visibilitychange',()=>{if(document.hidden&&active){paused=true;refresh();say('Пауза: вкладка неактивна.');}});
-  refresh();say('Нажмите на свободную площадку, чтобы выбрать башню.');
-  window.__TDEF_GAME__={startWave,getState:()=>({gold,baseHealth,wave,kills,enemies:enemies.length,towers:towers.length})};
+  refresh();say('Разместите башни на площадках и защитите крепость.');
+  window.__TDEF_GAME__={startWave,enterBattle,getState:()=>({gold,baseHealth,wave,kills,enemies:enemies.length,towers:towers.length})};
 }
