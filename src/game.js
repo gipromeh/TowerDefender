@@ -27,7 +27,7 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
   const pathLength=lengths.at(-1), enemies=[],towers=[],projectiles=[],effects=[];
   let gold=CONFIG.startingGold,baseHealth=CONFIG.baseHealth,wave=0,kills=0;
   let spawnLeft=0,spawnTimer=0,active=false,paused=false,speed=1,selectedPad=-1,gameOver=false,started=false,intermissionLeft=0,intermissionShown=0;
-  const materials={};
+  const materials={},visualAnimations=[];
   function material(name,color,emissive=false,alpha=1){
     const m=new B.StandardMaterial(name,scene);m.diffuseColor=B.Color3.FromHexString(color);
     if(emissive)m.emissiveColor=B.Color3.FromHexString(color);m.alpha=alpha;materials[name]=m;return m;
@@ -86,6 +86,46 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
     const halo=mesh(root,'magicHalo'+id,'torus',{diameter:.95,thickness:.045,tessellation:40},magicMat,[0,1.68,0]);halo.rotation.x=Math.PI/2;
     return {head:orb,barrel:halo};
   }
+  function animateScale(node,from,to,duration=.38){
+    node.scaling.setAll(from);
+    visualAnimations.push({node,from,to,duration,elapsed:0});
+  }
+  function addUpgradeVisual(tower,level){
+    const node=new B.TransformNode('upgradeVisual_'+tower.index+'_'+level,scene);
+    node.parent=tower.root;
+    const accent=material('upgradeAccent_'+tower.index+'_'+level,level===2?'#d6b66d':'#8fd4d1',true);
+    const steel=level===2?metalMat:gunnerMat;
+    mesh(node,'upgradeCollar_'+tower.index+'_'+level,'torus',{diameter:1.48+level*.08,thickness:.09,tessellation:48},accent,[0,.3,0]);
+    if(tower.type==='gunner'){
+      const count=level===2?2:4;
+      for(let i=0;i<count;i++){
+        const offset=(i-(count-1)/2)*.22;
+        const barrel=mesh(node,'upgradeBarrel_'+tower.index+'_'+level+'_'+i,'cylinder',{diameter:level===2?.13:.16,height:level===2?1.28:1.48,tessellation:20},steel,[offset,.2,.7]);
+        barrel.rotation.x=Math.PI/2;
+        mesh(node,'upgradeMuzzle_'+tower.index+'_'+level+'_'+i,'torus',{diameter:level===2?.16:.19,thickness:.025,tessellation:20},darkMat,[offset,.2,level===2?1.35:1.46]).rotation.x=Math.PI/2;
+      }
+      for(const side of [-1,1]){
+        mesh(node,'gunnerArmor_'+tower.index+'_'+level+'_'+side,'box',{width:.16,height:.48,depth:.62},accent,[side*.58,.05,-.05]);
+      }
+    }else if(tower.type==='mortar'){
+      tower.barrel.scaling.set(level===2?1.18:1.34,level===2?1.16:1.28,1);
+      for(const side of [-1,1]){
+        mesh(node,'mortarAmmo_'+tower.index+'_'+level+'_'+side,'cylinder',{diameter:level===2?.34:.42,height:.48,tessellation:20},accent,[side*.72,.82,-.18]);
+        mesh(node,'mortarArmor_'+tower.index+'_'+level+'_'+side,'box',{width:.18,height:.46,depth:.72},steel,[side*.64,.48,-.05]);
+      }
+      mesh(node,'mortarMuzzle_'+tower.index+'_'+level,'torus',{diameter:.56,thickness:.07,tessellation:28},accent,[0,.96,.68]).rotation.x=Math.PI/2-.42;
+    }else{
+      for(let i=0;i<(level===2?3:5);i++){
+        const angle=i/(level===2?3:5)*Math.PI*2;
+        const crystal=mesh(node,'magicCrystal_'+tower.index+'_'+level+'_'+i,'sphere',{diameter:level===2?.25:.31,segments:12},accent,[Math.cos(angle)*.78,1.35,Math.sin(angle)*.78]);
+        crystal.scaling.y=1.7;
+      }
+      const halo=mesh(node,'magicHaloUpgrade_'+tower.index+'_'+level,'torus',{diameter:level===2?1.75:2.05,thickness:.055,tessellation:48},accent,[0,1.68,0]);
+      halo.rotation.x=Math.PI/2;
+    }
+    animateScale(node,.02,1,.42);
+    tower.upgradeVisuals.push(node);
+  }
   function createTower(index,type){
     const def=TOWERS[type],p=pads[index],root=new B.TransformNode(type+'Root'+index,scene);
     root.position.set(p[0],p[1]+.5,p[2]);
@@ -95,7 +135,9 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
     else parts=createMagic(root,index);
     const ring=mesh(root,'rangeRing'+index,'torus',{diameter:def.range*2,thickness:.025,tessellation:72},material('range'+index,def.color,true,.25),[0,.035,0]);
     ring.isVisible=false;
-    return {index,type,root,head:parts.head,barrel:parts.barrel,ring,cooldown:0,level:1,invested:def.cost};
+    const tower={index,type,root,head:parts.head,barrel:parts.barrel,ring,cooldown:0,level:1,invested:def.cost,upgradeVisuals:[]};
+    animateScale(root,.04,1,.46);
+    return tower;
   }
   function hideMenu(){ui.menu.hidden=true;}
   function openMenu(index){
@@ -130,7 +172,7 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
     const def=TOWERS[type];if(!def||towers.some(t=>t.index===index))return;
     if(gold<def.cost){say('Недостаточно золота для '+def.name+'.');return;}
     gold-=def.cost;towers.push(createTower(index,type));say(def.name+' построена.');
-    openMenu(index);refresh();
+    hideMenu();selectedPad=-1;refresh();
   }
   function upgrade(){
     const tower=towers.find(t=>t.index===selectedPad);if(!tower||tower.level>=3)return;
@@ -141,7 +183,10 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
     tower.damage=def.damage*(1+.5*(tower.level-1));
     tower.reload=def.reload/(1+.12*(tower.level-1));
     tower.ring=mesh(tower.root,'rangeRingUp'+tower.index,'torus',{diameter:tower.range*2,thickness:.025,tessellation:72},material('rangeUp'+tower.index,def.color,true,.25),[0,.035,0]);
-    say(def.name+' улучшена до уровня '+tower.level+'.');openMenu(selectedPad);refresh();
+    addUpgradeVisual(tower,tower.level);
+    tower.root.scaling.setAll(1+(tower.level-1)*.035);
+    say(def.name+' улучшена до уровня '+tower.level+'. Новые модули установлены.');
+    hideMenu();selectedPad=-1;refresh();
   }
   function sell(){
     const i=towers.findIndex(t=>t.index===selectedPad);if(i<0)return;
@@ -194,6 +239,14 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
     }
   }
   function update(dt){
+    for(const animation of [...visualAnimations]){
+      animation.elapsed=Math.min(animation.duration,animation.elapsed+dt);
+      const t=animation.elapsed/animation.duration;
+      const eased=1-Math.pow(1-t,3);
+      const scale=animation.from+(animation.to-animation.from)*eased;
+      animation.node.scaling.setAll(scale);
+      if(t>=1)visualAnimations.splice(visualAnimations.indexOf(animation),1);
+    }
     if(paused||gameOver)return;const delta=dt*speed;
     if(!active){
       if(intermissionLeft>0){
