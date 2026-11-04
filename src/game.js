@@ -34,6 +34,16 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
     if(emissive)m.emissiveColor=B.Color3.FromHexString(color);m.alpha=alpha;materials[name]=m;return m;
   }
   const enemyMat=material('tdefEnemyMat','#a83232');
+  const goblinSkin=material('goblinSkin','#659b45');
+  const goblinDark=material('goblinDark','#355b2e');
+  const goblinCloth=material('goblinCloth','#8b4931');
+  const goblinLeather=material('goblinLeather','#49382b');
+  const goblinEye=material('goblinEye','#f1d66b',true);
+  const goblinTooth=material('goblinTooth','#e7dfc5');
+  const impactFlash=material('impactFlash','#ffd27a',true,.9);
+  const impactEmber=material('impactEmber','#ff7a2f',true,.95);
+  const impactDust=material('impactDust','#9a8060',false,.48);
+  const impactStone=material('impactStone','#5c5144');
   const bulletMat=material('tdefBulletMat','#ffd36a',true);
   const darkMat=material('towerDark','#303b43'), metalMat=material('towerMetal','#aeb9bb');
   const magicMat=material('magicGlow','#9e68ff',true),magicCoreMat=material('magicCore','#d8c7ff',true);
@@ -196,21 +206,67 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
     say('Башня продана. Возвращено '+refund+' золота.');refresh();
   }
   function spawnEnemy(){
-    const body=B.MeshBuilder.CreateSphere('normalEnemy'+(kills+enemies.length),{diameter:.72,segments:10},scene);
-    body.position.copyFrom(pointAt(0));body.position.y=.62;body.material=enemyMat;body.isPickable=false;
+    const id=kills+enemies.length+wave*100,root=new B.TransformNode('goblin_'+id,scene);
+    const part=(name,kind,opts,mat,pos)=>{
+      const m=kind==='sphere'?B.MeshBuilder.CreateSphere(name,opts,scene):kind==='box'?B.MeshBuilder.CreateBox(name,opts,scene):B.MeshBuilder.CreateCylinder(name,opts,scene);
+      m.parent=root;m.position.set(...pos);m.material=mat;m.isPickable=false;return m;
+    };
+    part('goblinBody'+id,'sphere',{diameter:1,segments:8},goblinCloth,[0,.53,0]).scaling.set(.48,.58,.34);
+    part('goblinBelly'+id,'sphere',{diameter:.55,segments:8},goblinSkin,[0,.57,.22]).scaling.set(.78,.78,.55);
+    part('goblinHead'+id,'sphere',{diameter:.62,segments:8},goblinSkin,[0,1.12,.02]).scaling.set(.9,1.02,.86);
+    for(const side of [-1,1]){
+      const ear=part('goblinEar'+id+'_'+side,'cylinder',{diameterTop:0,diameterBottom:.28,height:.52,tessellation:5},goblinSkin,[side*.39,1.2,.02]);
+      ear.rotation.z=-side*.95;
+      part('goblinEye'+id+'_'+side,'sphere',{diameter:.105,segments:8},goblinEye,[side*.15,1.18,.285]);
+      part('goblinPupil'+id+'_'+side,'sphere',{diameter:.045,segments:6},goblinDark,[side*.15,1.18,.33]);
+      const arm=part('goblinArm'+id+'_'+side,'cylinder',{diameter:.2,height:.58,tessellation:7},goblinSkin,[side*.42,.68,.02]);arm.rotation.z=side*.45;
+    }
+    part('goblinNose'+id,'sphere',{diameter:.16,segments:6},goblinDark,[0,1.05,.36]);
+    part('goblinFang'+id,'cylinder',{diameterTop:0,diameterBottom:.09,height:.18,tessellation:5},goblinTooth,[.12,.91,.29]);
+    const club=part('goblinClub'+id,'cylinder',{diameter:.15,height:.72,tessellation:7},goblinLeather,[.52,.65,.12]);club.rotation.z=-.5;
+    const legs=[];
+    for(const side of [-1,1]){
+      legs.push(part('goblinLeg'+id+'_'+side,'cylinder',{diameter:.22,height:.43,tessellation:7},goblinDark,[side*.18,.2,0]));
+      part('goblinFoot'+id+'_'+side,'box',{width:.27,height:.12,depth:.34},goblinLeather,[side*.18,.045,.1]);
+    }
+    const p=pointAt(0);root.position.set(p.x,.18,p.z);
     const back=B.MeshBuilder.CreateBox('enemyHealthBack',{width:.9,height:.09,depth:.07},scene);
     const fill=B.MeshBuilder.CreateBox('enemyHealthFill',{width:.86,height:.07,depth:.08},scene);
-    const backMat=material('enemyBack'+enemies.length,'#351e1e'),fillMat=material('enemyFill'+enemies.length,'#68d36e');
+    const backMat=material('enemyBack'+id,'#351e1e'),fillMat=material('enemyFill'+id,'#68d36e');
     back.material=backMat;fill.material=fillMat;back.isPickable=fill.isPickable=false;
-    enemies.push({mesh:body,barBack:back,barFill:fill,hp:CONFIG.enemy.hp,distance:0,dead:false});
+    enemies.push({mesh:root,barBack:back,barFill:fill,legs,hp:CONFIG.enemy.hp,distance:0,dead:false,phase:Math.random()*Math.PI*2});
+    spawnBurst(new B.Vector3(p.x,.25,p.z),'spawn');
   }
   function removeEnemy(enemy,reachedBase=false){
     if(enemy.dead)return;enemy.dead=true;
+    const deathPoint=enemy.mesh.position.clone();
     enemy.mesh.dispose();enemy.barBack.dispose();enemy.barFill.dispose();
+    if(!reachedBase)spawnBurst(deathPoint,'goblin');
     const i=enemies.indexOf(enemy);if(i>=0)enemies.splice(i,1);
-    if(reachedBase){baseHealth=Math.max(0,baseHealth-CONFIG.enemy.baseDamage);if(baseHealth===0){gameOver=true;active=false;say('Поражение: база уничтожена.');}}
+    if(reachedBase){baseHealth=Math.max(0,baseHealth-CONFIG.enemy.baseDamage);spawnBurst(deathPoint,'base');if(baseHealth===0){gameOver=true;active=false;say('Поражение: база уничтожена.');}}
     else{gold+=CONFIG.enemy.reward;kills++;}
     refresh();
+  }
+  function spawnBurst(position,kind='mortar'){
+    const mortar=kind==='mortar',spawn=kind==='spawn',count=mortar?18:8;
+    const flash=B.MeshBuilder.CreateSphere('impactFlash',{diameter:mortar?1.05:.48,segments:10},scene);
+    flash.position.copyFrom(position);flash.position.y+=.12;flash.material=spawn?goblinEye:impactFlash;flash.isPickable=false;
+    effects.push({mesh:flash,life:mortar?.22:.14,maxLife:mortar?.22:.14,kind:'flash'});
+    const ring=B.MeshBuilder.CreateTorus('impactShockwave',{diameter:.45,thickness:mortar?.12:.055,tessellation:28},scene);
+    ring.position.set(position.x,.12,position.z);ring.material=spawn?goblinEye:impactEmber;ring.isPickable=false;
+    effects.push({mesh:ring,life:mortar?.58:.34,maxLife:mortar?.58:.34,kind:'ring'});
+    for(let i=0;i<count;i++){
+      const angle=Math.random()*Math.PI*2,v=(mortar?2.2:1.1)+Math.random()*(mortar?4.2:1.8);
+      const mesh=mortar&&i%3===0?B.MeshBuilder.CreateBox('impactDebris',{size:.16+Math.random()*.16},scene):B.MeshBuilder.CreateSphere('impactParticle',{diameter:.09+Math.random()*.13,segments:6},scene);
+      mesh.position.set(position.x+(Math.random()-.5)*.28,.18+Math.random()*.18,position.z+(Math.random()-.5)*.28);
+      mesh.material=mortar?(i%3===0?impactStone:impactEmber):(spawn?goblinSkin:impactDust);mesh.isPickable=false;
+      effects.push({mesh,life:.35+Math.random()*.42,maxLife:.77,kind:'particle',velocity:new B.Vector3(Math.cos(angle)*v,(mortar?2.2:1.1)+Math.random()*2,Math.sin(angle)*v),spin:(Math.random()-.5)*9});
+    }
+    if(mortar){
+      const dust=B.MeshBuilder.CreateSphere('impactDustCloud',{diameter:1.2,segments:8},scene);
+      dust.position.set(position.x,.28,position.z);dust.scaling.set(1,.25,1);dust.material=impactDust;dust.isPickable=false;
+      effects.push({mesh:dust,life:.72,maxLife:.72,kind:'dust'});
+    }
   }
   function addBolt(from,to,color='#9e68ff'){
     const points=[];const steps=7;
@@ -262,8 +318,12 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
     for(const enemy of [...enemies]){
       enemy.distance+=CONFIG.enemy.speed*delta;
       if(enemy.distance>=pathLength){removeEnemy(enemy,true);continue;}
-      const p=pointAt(enemy.distance);enemy.mesh.position.set(p.x,.62,p.z);
-      enemy.barBack.position.set(p.x,1.18,p.z);enemy.barFill.position.set(p.x-.02,1.18,p.z);
+      const p=pointAt(enemy.distance),ahead=pointAt(Math.min(pathLength,enemy.distance+.12)),behind=pointAt(Math.max(0,enemy.distance-.12));
+      const tangent=ahead.subtract(behind),gait=Math.sin(enemy.distance*5.8+enemy.phase);
+      enemy.mesh.position.set(p.x,.18+Math.abs(gait)*.045,p.z);
+      enemy.mesh.rotation.y=Math.atan2(tangent.x,tangent.z);
+      enemy.legs.forEach((leg,index)=>{leg.rotation.x=(index===0?1:-1)*gait*.62;});
+      enemy.barBack.position.set(p.x,1.68+Math.abs(gait)*.045,p.z);enemy.barFill.position.set(p.x-.02,1.68+Math.abs(gait)*.045,p.z);
       enemy.barFill.scaling.x=Math.max(.01,enemy.hp/CONFIG.enemy.hp);
     }
     for(const tower of towers){
@@ -288,6 +348,7 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
         if(t>=1){
           const impact=destination.clone();
           const nearby=enemies.filter(e=>!e.dead&&B.Vector3.Distance(e.mesh.position,impact)<=TOWERS.mortar.splash);
+          spawnBurst(impact,'mortar');
           nearby.forEach(e=>{e.hp-=shot.damage;if(e.hp<=0)removeEnemy(e);});
           shot.mesh.dispose();projectiles.splice(projectiles.indexOf(shot),1);
         }
@@ -299,7 +360,14 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
         }else shot.mesh.position.addInPlace(diff.normalize().scale(step));
       }
     }
-    for(const effect of [...effects]){effect.life-=delta;if(effect.life<=0){effect.mesh.dispose();effects.splice(effects.indexOf(effect),1);}}
+    for(const effect of [...effects]){
+      effect.life-=delta;const t=1-Math.max(0,effect.life)/effect.maxLife;
+      if(effect.kind==='ring'){const scale=1+t*(effect.maxLife>.5?5.5:3.2);effect.mesh.scaling.set(scale,scale,scale);effect.mesh.material.alpha=Math.max(0,1-t);}
+      else if(effect.kind==='flash'){effect.mesh.scaling.setAll(1+t*2.8);effect.mesh.material.alpha=Math.max(0,1-t);}
+      else if(effect.kind==='dust'){effect.mesh.scaling.set(1+t*3,.25+t*.8,1+t*3);effect.mesh.material.alpha=Math.max(0,.48*(1-t));}
+      else if(effect.kind==='particle'){effect.mesh.position.addInPlace(effect.velocity.scale(delta));effect.velocity.y-=5.5*delta;effect.mesh.rotation.x+=effect.spin*delta;effect.mesh.rotation.z+=effect.spin*.7*delta;effect.mesh.material.alpha=Math.max(0,1-t);}
+      if(effect.life<=0){effect.mesh.dispose();effects.splice(effects.indexOf(effect),1);}
+    }
     if(active&&spawnLeft===0&&enemies.length===0){
       active=false;gold+=20+5*wave;hideMenu();
       intermissionLeft=5;intermissionShown=5;beginCountdown(5,'Следующая волна');
@@ -319,7 +387,8 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
     if(active||gameOver)return;
     started=true;intermissionLeft=0;intermissionShown=0;hideCountdown();hideMenu();
     wave++;spawnLeft=CONFIG.enemiesPerWave(wave);spawnTimer=0;active=true;paused=false;
-    say('Волна '+wave+': противник приближается.');refresh();
+    spawnBurst(pointAt(0),'spawn');
+    say('Волна '+wave+': гоблины идут к крепости!');refresh();
   }
   scene.onPointerObservable.add(info=>{
     if(info.type!==B.PointerEventTypes.POINTERPICK)return;
