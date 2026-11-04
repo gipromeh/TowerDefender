@@ -135,7 +135,7 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
     else parts=createMagic(root,index);
     const ring=mesh(root,'rangeRing'+index,'torus',{diameter:def.range*2,thickness:.025,tessellation:72},material('range'+index,def.color,true,.25),[0,.035,0]);
     ring.isVisible=false;
-    const tower={index,type,root,head:parts.head,barrel:parts.barrel,ring,cooldown:0,level:1,invested:def.cost,upgradeVisuals:[]};
+    const tower={index,type,root,head:parts.head,barrel:parts.barrel,ring,cooldown:0,level:1,invested:def.cost,upgradeVisuals:[],targetYaw:0};
     animateScale(root,.04,1,.46);
     return tower;
   }
@@ -184,14 +184,14 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
     tower.reload=def.reload/(1+.12*(tower.level-1));
     tower.ring=mesh(tower.root,'rangeRingUp'+tower.index,'torus',{diameter:tower.range*2,thickness:.025,tessellation:72},material('rangeUp'+tower.index,def.color,true,.25),[0,.035,0]);
     addUpgradeVisual(tower,tower.level);
-    tower.root.scaling.setAll(1+(tower.level-1)*.035);
+    animateScale(tower.root,tower.root.scaling.x,1+(tower.level-1)*.035,.32);
     say(def.name+' улучшена до уровня '+tower.level+'. Новые модули установлены.');
     hideMenu();selectedPad=-1;refresh();
   }
   function sell(){
     const i=towers.findIndex(t=>t.index===selectedPad);if(i<0)return;
     const tower=towers[i],refund=Math.floor(tower.invested*CONFIG.sellRate);
-    gold+=refund;tower.root.dispose();towers.splice(i,1);hideMenu();
+    gold+=refund;tower.root.dispose();towers.splice(i,1);hideMenu();selectedPad=-1;
     say('Башня продана. Возвращено '+refund+' золота.');refresh();
   }
   function spawnEnemy(){
@@ -226,7 +226,7 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
     const damage=tower.damage??def.damage,range=tower.range??def.range;
     tower.cooldown=tower.reload??def.reload;
     const direction=target.mesh.position.subtract(origin);
-    if(tower.head)tower.head.rotation.y=Math.atan2(direction.x,direction.z);
+    if(tower.head)tower.targetYaw=Math.atan2(direction.x,direction.z);
     if(tower.type==='magic'){
       const candidates=enemies.filter(e=>!e.dead&&B.Vector3.Distance(e.mesh.position,target.mesh.position)<3)
         .sort((a,b)=>B.Vector3.Distance(a.mesh.position,target.mesh.position)-B.Vector3.Distance(b.mesh.position,target.mesh.position)).slice(0,def.chain);
@@ -266,6 +266,7 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
       enemy.barFill.scaling.x=Math.max(.01,enemy.hp/CONFIG.enemy.hp);
     }
     for(const tower of towers){
+      if(tower.head){const turn=Math.atan2(Math.sin(tower.targetYaw-tower.head.rotation.y),Math.cos(tower.targetYaw-tower.head.rotation.y));tower.head.rotation.y+=turn*Math.min(1,delta*8);}
       tower.cooldown-=delta;const def=TOWERS[tower.type],range=tower.range??def.range;
       const center=tower.root.position;
       const target=enemies.filter(e=>!e.dead).filter(e=>B.Vector3.Distance(new B.Vector3(e.mesh.position.x,0,e.mesh.position.z),new B.Vector3(center.x,0,center.z))<=range)
