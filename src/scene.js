@@ -73,10 +73,24 @@ for(const side of [-1,1]){
  const edge=curve.map(p=>new B.Vector3(p.x,p.y+0.015,p.z+side*1.22));
  const border=B.MeshBuilder.CreateTube('roadBorder'+side,{path:edge,radius:0.11,tessellation:6},scene);border.material=M.edge;
 }
-for(let i=0;i<145;i++){
- const p=curve[Math.floor(i/145*(curve.length-1))],offset=Math.sin(i*12.989)*0.72;
- const stone=B.MeshBuilder.CreateBox('roadPaver'+i,{width:0.28+(i%3)*0.07,height:0.035,depth:0.18},scene);
- stone.position.set(p.x+offset,0.205,p.z+Math.cos(i*5.3)*0.75);stone.rotation.y=(i%7)*0.17;stone.material=i%4===0?M.lightStone:M.edge;
+// Staggered terracotta brick paving, dark joints and a worn stone kerb.
+const brickMaterials=['#a85d3e','#b66b48','#985239','#c17a51','#8f4a35'].map((c,i)=>material('roadBrickMat'+i,c,0.96));
+let roadDistance=0,brickRow=0,brickIndex=0;
+const roadSegments=[0];
+for(let i=1;i<curve.length;i++)roadSegments.push(roadSegments[i-1]+B.Vector3.Distance(curve[i-1],curve[i]));
+const roadLength=roadSegments[roadSegments.length-1];
+for(let d=.32;d<roadLength;d+=.72,brickRow++){
+ const targetDistance=d+(brickRow%2)*.36;
+ let seg=0;while(seg<roadSegments.length-2&&roadSegments[seg+1]<targetDistance)seg++;
+ const span=roadSegments[seg+1]-roadSegments[seg],t=span?(targetDistance-roadSegments[seg])/span:0;
+ const center=B.Vector3.Lerp(curve[seg],curve[seg+1],t),tangent=curve[seg+1].subtract(curve[seg]).normalize();
+ const lateral=new B.Vector3(-tangent.z,0,tangent.x),yaw=Math.atan2(tangent.x,tangent.z);
+ for(let col=-1;col<=1;col++){
+  const p=center.add(lateral.scale(col*.69));
+  const brick=B.MeshBuilder.CreateBox('roadBrick'+brickIndex,{width:.66,height:.105,depth:.62},scene);
+  brick.position.set(p.x,.205,p.z);brick.rotation.y=yaw+(Math.random()-.5)*.025;
+  brick.material=brickMaterials[(brickIndex*7+brickRow*3+col+5)%brickMaterials.length];brick.receiveShadows=true;brick.isPickable=false;brickIndex++;
+ }
 }
 
 // Eight future tower pads.
