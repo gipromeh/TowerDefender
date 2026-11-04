@@ -18,6 +18,7 @@ html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#17221c;fon
 #gameHud .controls{display:grid;grid-template-columns:1fr auto;gap:6px;padding:0 9px 9px}
 #gameHud button,#gameHud select{min-height:34px;border:1px solid #b99a68;border-radius:6px;background:#354638;color:#fff4dc;padding:6px 9px;font-weight:600;font-size:12px}
 #gameHud button:disabled{opacity:.45}#gameHud label{align-self:center}
+#startWave[hidden]{display:none}
 #gameMessage{grid-column:1/-1;min-height:18px;line-height:1.3;color:#f4d99a}
 #contextMenu{position:fixed;z-index:12;left:50%;bottom:max(14px,env(safe-area-inset-bottom));transform:translateX(-50%);width:min(570px,calc(100vw - 24px));padding:12px;color:#f5eedf;background:#17241ff2;border:1px solid #d5b77b99;border-radius:13px;box-shadow:0 8px 30px #0008;backdrop-filter:blur(12px)}
 #contextMenu[hidden]{display:none}
@@ -25,7 +26,7 @@ html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#17221c;fon
 #contextTitle{font-size:15px;font-weight:700}#contextInfo{font-size:11px;color:#c9c1ae;margin-bottom:10px}
 .contextGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .contextGrid button{min-width:0;min-height:76px;padding:8px 5px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;border:1px solid #77877a;border-radius:9px;background:#2d4035;color:#fff4dc;font-size:12px;font-weight:700}
-.contextGrid button:disabled{opacity:.4}.contextGrid button .symbol{font-size:22px;line-height:1.1}.contextGrid button small{font-size:10px;color:#e5d5ac;font-weight:400}
+.contextGrid button:disabled{opacity:.4}.contextGrid button .weaponIcon{width:48px;height:42px;object-fit:contain;filter:drop-shadow(0 2px 2px #0008)}.contextGrid button small{font-size:10px;color:#e5d5ac;font-weight:400}
 .contextActions{display:flex;gap:8px}.contextActions button{flex:1;min-height:40px;border:1px solid #b99a68;border-radius:8px;background:#354638;color:#fff4dc;font-weight:700}
 .contextActions button.sell{background:#593d31;border-color:#b47b60}
 #closeContext{border:0;background:transparent;color:#e8ddc8;font-size:21px;padding:0 5px}
@@ -40,7 +41,7 @@ html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#17221c;fon
 <details id="gameHud" aria-label="Панель игры">
 <summary><span class="stats"><span>Золото <strong id="goldValue">100</strong></span><span>База <strong id="baseValue">20</strong></span><span>Волна <strong id="waveValue">0</strong></span><span>Убийства <strong id="killsValue">0</strong></span></span></summary>
 <div class="controls">
-<button id="startWave" type="button">Старт волны</button>
+<button id="startWave" type="button">Начать осаду</button>
 <button id="pauseGame" type="button" disabled>Пауза</button>
 <label for="gameSpeed">Скорость</label>
 <select id="gameSpeed"><option value="1">×1</option><option value="2">×2</option><option value="3">×3</option></select>
@@ -52,9 +53,9 @@ html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#17221c;fon
 <div class="contextHead"><div id="contextTitle">Площадка</div><button id="closeContext" type="button" aria-label="Закрыть">×</button></div>
 <div id="contextInfo">Выберите тип башни</div>
 <div class="contextGrid" id="buildOptions">
-<button type="button" data-build="gunner"><span class="symbol">◉</span><span>Gunner</span><small data-price>50 золота</small></button>
-<button type="button" data-build="mortar"><span class="symbol">◌</span><span>Мортира</span><small data-price>100 золота</small></button>
-<button type="button" data-build="magic"><span class="symbol">✧</span><span>Магическая</span><small data-price>90 золота</small></button>
+<button type="button" data-build="gunner"><img class="weaponIcon" src="./icons/gunner.svg" alt=""><span>Пулемёт</span><small data-price>50 золота</small></button>
+<button type="button" data-build="mortar"><img class="weaponIcon" src="./icons/mortar.svg" alt=""><span>Мортира</span><small data-price>100 золота</small></button>
+<button type="button" data-build="magic"><img class="weaponIcon" src="./icons/magic.svg" alt=""><span>Магическая</span><small data-price>90 золота</small></button>
 </div>
 <div class="contextActions" id="towerActions">
 <button id="upgradeTower" type="button">Улучшить</button>
