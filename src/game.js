@@ -26,7 +26,7 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
   for(let i=1;i<path.length;i++)lengths.push(lengths[i-1]+B.Vector3.Distance(path[i-1],path[i]));
   const pathLength=lengths.at(-1), enemies=[],towers=[],projectiles=[],effects=[];
   let gold=CONFIG.startingGold,baseHealth=CONFIG.baseHealth,wave=0,kills=0;
-  let spawnLeft=0,spawnTimer=0,active=false,paused=false,speed=1,selectedPad=-1,gameOver=false;
+  let spawnLeft=0,spawnTimer=0,active=false,paused=false,speed=1,selectedPad=-1,gameOver=false,started=false,intermissionLeft=0,intermissionShown=0;
   const materials={};
   function material(name,color,emissive=false,alpha=1){
     const m=new B.StandardMaterial(name,scene);m.diffuseColor=B.Color3.FromHexString(color);
@@ -40,7 +40,7 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
   function say(text){ui.message.textContent=text;}
   function refresh(){
     ui.gold.textContent=gold;ui.base.textContent=baseHealth;ui.wave.textContent=wave;ui.kills.textContent=kills;
-    ui.start.disabled=active||gameOver;ui.pause.disabled=!active;ui.pause.textContent=paused?'Продолжить':'Пауза';
+    ui.start.hidden=started;ui.start.disabled=started||gameOver;ui.pause.disabled=!active;ui.pause.textContent=paused?'Продолжить':'Пауза';
     ui.speed.disabled=!active;ui.selected.textContent=selectedPad<0?'—':String(selectedPad+1);
   }
   function pointAt(distance){
@@ -194,7 +194,16 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
     }
   }
   function update(dt){
-    if(!active||paused||gameOver)return;const delta=dt*speed;
+    if(paused||gameOver)return;const delta=dt*speed;
+    if(!active){
+      if(intermissionLeft>0){
+        intermissionLeft=Math.max(0,intermissionLeft-delta);
+        const seconds=Math.ceil(intermissionLeft);
+        if(seconds!==intermissionShown){intermissionShown=seconds;say('Следующая волна через '+seconds+' сек.');}
+        if(intermissionLeft===0)startWave();
+      }
+      return;
+    }
     if(spawnLeft>0){spawnTimer-=delta;while(spawnLeft>0&&spawnTimer<=0){spawnEnemy();spawnLeft--;spawnTimer+=CONFIG.spawnInterval;}}
     for(const enemy of [...enemies]){
       enemy.distance+=CONFIG.enemy.speed*delta;
@@ -236,9 +245,18 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
       }
     }
     for(const effect of [...effects]){effect.life-=delta;if(effect.life<=0){effect.mesh.dispose();effects.splice(effects.indexOf(effect),1);}}
-    if(active&&spawnLeft===0&&enemies.length===0){active=false;gold+=20+5*wave;say('Волна '+wave+' отражена. Награда: '+(20+5*wave)+'.');hideMenu();refresh();}
+    if(active&&spawnLeft===0&&enemies.length===0){
+      active=false;gold+=20+5*wave;hideMenu();
+      intermissionLeft=5;intermissionShown=5;
+      say('Волна '+wave+' отражена. Награда: '+(20+5*wave)+'. Следующая волна через 5 сек.');refresh();
+    }
   }
-  function startWave(){if(active||gameOver)return;hideMenu();wave++;spawnLeft=CONFIG.enemiesPerWave(wave);spawnTimer=0;active=true;paused=false;say('Волна '+wave+': противник приближается.');refresh();}
+  function startWave(){
+    if(active||gameOver)return;
+    started=true;intermissionLeft=0;intermissionShown=0;hideMenu();
+    wave++;spawnLeft=CONFIG.enemiesPerWave(wave);spawnTimer=0;active=true;paused=false;
+    say('Волна '+wave+': противник приближается.');refresh();
+  }
   scene.onPointerObservable.add(info=>{
     if(info.type!==B.PointerEventTypes.POINTERPICK)return;
     if(!info.pickInfo?.hit){hideMenu();return;}
