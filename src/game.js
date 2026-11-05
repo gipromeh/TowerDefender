@@ -31,7 +31,7 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
     targetPriority:$('targetPriority'),branchPanel:$('branchPanel'),
     branchA:$('branchA'),branchB:$('branchB'),wavePreview:$('wavePreview'),
     frost:$('frostSpell'),meteor:$('meteorSpell'),spellStatus:$('spellStatus'),
-    campaign:$('campaignStatus'),victory:$('victoryScreen'),victoryNext:$('nextMap')
+    campaign:$('campaignStatus'),achievement:$('achievementStatus'),victory:$('victoryScreen'),victoryNext:$('nextMap'),victoryStats:$('victoryStats')
   };
   const path=curve.map(p=>p.clone()), lengths=[0];
   for(let i=1;i<path.length;i++)lengths.push(lengths[i-1]+B.Vector3.Distance(path[i-1],path[i]));
@@ -40,6 +40,8 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
   let spawnLeft=0,spawnTimer=0,active=false,paused=false,speed=1,selectedPad=-1,gameOver=false,started=false,intermissionLeft=0,intermissionShown=0,countdownLeft=0,countdownShown=0;
   let spawnQueue=[],frostCooldown=0,meteorCooldown=0,frostTime=0,selectedMap=Number(new URLSearchParams(location.search).get('map')||0);
   const maxCampaignWaves=CONFIG.campaignWaves,unlockedMap=Number(localStorage.getItem('tdefUnlockedMap')||0);
+  const mapNames=['Зелёные холмы','Северный перевал','Затонувшие руины'];
+  const achievements=JSON.parse(localStorage.getItem('tdefAchievements')||'[]');
   const spellState={frost:0,meteor:0};
   const materials={},visualAnimations=[],enemyVisuals={};
   const enemyHealthBackMat=material('enemyHealthBackMat','#351e1e');
@@ -72,7 +74,8 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
     if(ui.frost)ui.frost.disabled=frostCooldown>0||gameOver;
     if(ui.meteor)ui.meteor.disabled=meteorCooldown>0||gameOver;
     if(ui.spellStatus)ui.spellStatus.textContent=(frostCooldown>0?'Лёд '+Math.ceil(frostCooldown)+'с':'Лёд готов')+' · '+(meteorCooldown>0?'Метеор '+Math.ceil(meteorCooldown)+'с':'Метеор готов');
-    if(ui.campaign)ui.campaign.textContent='Кампания · карта '+(selectedMap+1)+' · '+wave+'/'+maxCampaignWaves;
+    if(ui.campaign)ui.campaign.textContent='Кампания · '+mapNames[selectedMap]+' · '+wave+'/'+maxCampaignWaves;
+    if(ui.achievement)ui.achievement.textContent='Достижения: '+(achievements.length?achievements.join(' · '):'пока нет');
   }
   function pointAt(distance){
     const d=Math.max(0,Math.min(pathLength,distance));let lo=0,hi=lengths.length-1;
@@ -332,7 +335,15 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
     if(!reachedBase)spawnBurst(deathPoint,'goblin');
     const i=enemies.indexOf(enemy);if(i>=0)enemies.splice(i,1);
     if(reachedBase){baseHealth=Math.max(0,baseHealth-enemy.baseDamage);spawnBurst(deathPoint,'base');if(baseHealth===0){gameOver=true;active=false;say('Поражение: база уничтожена.');}}
-    else{gold+=enemy.reward;kills++;}
+    else{
+      gold+=enemy.reward;kills++;
+      const newly=[];
+      if(kills>=1&&!achievements.includes('Первая кровь'))newly.push('Первая кровь');
+      if(kills>=25&&!achievements.includes('Истребитель'))newly.push('Истребитель');
+      if(wave>=5&&!achievements.includes('Защитник'))newly.push('Защитник');
+      if(kills>=100&&!achievements.includes('Гроза орков'))newly.push('Гроза орков');
+      if(newly.length){achievements.push(...newly);localStorage.setItem('tdefAchievements',JSON.stringify(achievements));say('Достижение: '+newly.join(', '));}
+    }
     refresh();
   }
   function spawnBurst(position,kind='mortar'){
@@ -476,6 +487,11 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
       active=false;gold+=25+8*wave;hideMenu();
       if(wave>=maxCampaignWaves){
         gameOver=true;const next=Math.min(2,selectedMap+1);localStorage.setItem('tdefUnlockedMap',String(Math.max(unlockedMap,next)));
+        const stars=baseHealth>=20?3:baseHealth>=12?2:1;
+        const bestKey='tdefStars_'+selectedMap,best=Math.max(stars,Number(localStorage.getItem(bestKey)||0));
+        localStorage.setItem(bestKey,String(best));
+        if(!achievements.includes('Безупречная оборона')&&baseHealth===CONFIG.baseHealth){achievements.push('Безупречная оборона');localStorage.setItem('tdefAchievements',JSON.stringify(achievements));}
+        if(ui.victoryStats)ui.victoryStats.textContent=mapNames[selectedMap]+' завершены · '+('★'.repeat(stars)+'☆'.repeat(3-stars))+' · лучший результат: '+('★'.repeat(best)+'☆'.repeat(3-best))+' · база: '+baseHealth+'/'+CONFIG.baseHealth;
         if(ui.victory)ui.victory.hidden=false;
         if(ui.victoryNext){ui.victoryNext.disabled=next<=selectedMap;ui.victoryNext.textContent=next<=selectedMap?'Кампания завершена':'Открыта следующая карта · перейти';}
         say('Победа! Кампания на этой карте завершена.');
