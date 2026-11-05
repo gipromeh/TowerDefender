@@ -25,7 +25,7 @@ const material=(name,color,roughness=0.9,metallic=0)=>{
  const m=new B.PBRMaterial(name,scene); m.albedoColor=B.Color3.FromHexString(color); m.roughness=roughness; m.metallic=metallic; return m;
 };
 const M={
- grass:material('grass','#66834b'), soil:material('soil','#75583a'), road:material('road','#b99a68'),
+ grass:material('grass',mapId===1?'#71808a':mapId===2?'#758b63':'#66834b'), soil:material('soil',mapId===1?'#555d64':mapId===2?'#75664d':'#75583a'), road:material('road',mapId===1?'#8e999d':mapId===2?'#b5a17c':'#b99a68'),
  edge:material('roadEdge','#756044'), stone:material('stone','#777b78'), lightStone:material('lightStone','#a3a69b'),
  wall:material('castleWall','#b7b8ae'), roof:material('roof','#344d70'), wood:material('wood','#65452c'),
  leaf:material('leaf','#31563b'), leaf2:material('leaf2','#496d43'), water:material('water','#287f91',0.24,0.18),
@@ -59,11 +59,25 @@ for(let i=0;i<34;i++){
 }
 
 // Winding road from spawn to castle.
-const points=[
- [-15,0.17,4.9],[-11.4,0.17,4.7],[-8.4,0.17,2.9],[-7.8,0.17,-0.1],
- [-9.8,0.17,-3],[-7.4,0.17,-5.7],[-3.4,0.17,-5.5],[-0.4,0.17,-3],
- [2.7,0.17,-1],[6.5,0.17,-1.6],[9.2,0.17,0.8],[12.3,0.17,1.2],[14.1,0.17,-1.1]
-].map(p=>new B.Vector3(...p));
+const mapId=Math.max(0,Math.min(2,Number(new URLSearchParams(location.search).get('map')||0)));
+const routePoints=[
+ [
+  [-15,0.17,4.9],[-11.4,0.17,4.7],[-8.4,0.17,2.9],[-7.8,0.17,-0.1],
+  [-9.8,0.17,-3],[-7.4,0.17,-5.7],[-3.4,0.17,-5.5],[-0.4,0.17,-3],
+  [2.7,0.17,-1],[6.5,0.17,-1.6],[9.2,0.17,0.8],[12.3,0.17,1.2],[14.1,0.17,-1.1]
+ ],
+ [
+  [-15,0.17,4.9],[-12.5,0.17,7],[-9.2,0.17,7.2],[-7,0.17,4.2],
+  [-5.7,0.17,.6],[-3.1,0.17,-1.2],[-1.8,0.17,-5.2],[1.4,0.17,-7],
+  [5.1,0.17,-6.5],[7.4,0.17,-3.2],[10.2,0.17,-2],[12.6,0.17,-.1],[14.1,0.17,-1.1]
+ ],
+ [
+  [-15,0.17,4.9],[-12.7,0.17,2],[-10.2,0.17,-1],[-7.2,0.17,-3.8],
+  [-4.2,0.17,-4.3],[-1.8,0.17,-1.4],[1.2,0.17,2.4],[4.2,0.17,4.4],
+  [7.3,0.17,3.2],[9.3,0.17,.4],[11.4,0.17,-1.8],[13.1,0.17,-1.2],[14.1,0.17,-1.1]
+ ]
+];
+const points=routePoints[mapId].map(p=>new B.Vector3(...p));
 const curve=B.Curve3.CreateCatmullRomSpline(points,12,false).getPoints();
 const road=B.MeshBuilder.CreateRibbon('roadSurface',{pathArray:[
  curve.map(p=>new B.Vector3(p.x,p.y,p.z-1.15)),curve.map(p=>new B.Vector3(p.x,p.y,p.z+1.15))
@@ -74,7 +88,7 @@ for(const side of [-1,1]){
  const border=B.MeshBuilder.CreateTube('roadBorder'+side,{path:edge,radius:0.11,tessellation:6},scene);border.material=M.edge;
 }
 // Staggered terracotta brick paving, dark joints and a worn stone kerb.
-const brickMaterials=['#a85d3e','#b66b48','#985239','#c17a51','#8f4a35'].map((c,i)=>material('roadBrickMat'+i,c,0.96));
+const brickMaterials=(mapId===1?['#747d82','#8a9293','#656f75','#a0a5a0','#5d686d']:mapId===2?['#9c7953','#b18d61','#84684b','#c1a176','#73583e']:['#a85d3e','#b66b48','#985239','#c17a51','#8f4a35']).map((c,i)=>material('roadBrickMat'+i,c,0.96));
 let roadDistance=0,brickRow=0,brickIndex=0;
 const roadSegments=[0];
 for(let i=1;i<curve.length;i++)roadSegments.push(roadSegments[i-1]+B.Vector3.Distance(curve[i-1],curve[i]));
@@ -94,7 +108,12 @@ for(let d=.32;d<roadLength;d+=.72,brickRow++){
 }
 
 // Eight future tower pads.
-const pads=[[-12.4,0.2,0],[-10.5,0.2,-6.4],[-5.2,0.2,-8.4],[0.1,0.2,-7.2],[4.5,0.2,2.8],[8.8,0.2,4.8],[12.1,0.2,-4.2],[-2.5,0.2,6.8]];
+const padSets=[
+ [[-12.4,0.2,0],[-10.5,0.2,-6.4],[-5.2,0.2,-8.4],[0.1,0.2,-7.2],[4.5,0.2,2.8],[8.8,0.2,4.8],[12.1,0.2,-4.2],[-2.5,0.2,6.8]],
+ [[-12.2,0.2,-1.5],[-9.8,0.2,9],[-5.7,0.2,-7.8],[-1.8,0.2,1.8],[2.2,0.2,-9],[5.8,0.2,-2.1],[9.8,0.2,4.8],[13.1,0.2,-5.2]],
+ [[-13.2,0.2,-1.2],[-10.4,0.2,-7.3],[-6.2,0.2,6.5],[-3.4,0.2,-7.8],[2.1,0.2,-6.2],[5.8,0.2,7.2],[10.1,0.2,4.9],[12.4,0.2,-5.4]]
+];
+const pads=padSets[mapId];
 pads.forEach((p,i)=>{
  const padBase=cylinder('towerPadBase'+i,p[0],p[1],p[2],2.55,0.28,M.edge,12);
  padBase.metadata={tdefPadIndex:i};
@@ -196,6 +215,13 @@ scene.onBeforeRenderObservable.add(()=>{
 });
 engine.runRenderLoop(()=>scene.render());
 window.addEventListener('resize',()=>{engine.resize();resizeCamera();});
+const mapSelect=document.getElementById('mapSelect');
+if(mapSelect){
+ const unlocked=Math.max(0,Math.min(2,Number(localStorage.getItem('tdefUnlockedMap')||0)));
+ [...mapSelect.options].forEach(option=>{option.disabled=Number(option.value)>unlocked;});
+ mapSelect.value=String(mapId);
+ mapSelect.addEventListener('change',()=>{location.href=location.pathname+'?map='+mapSelect.value;});
+}
 attachGame({B,scene,engine,curve,pads});
 window.__TDEF_SCENE_STARTED=true;
 })();
