@@ -380,8 +380,7 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
   function fire(tower,target){
     const def=TOWERS[tower.type],origin=tower.root.position.add(new B.Vector3(0,tower.type==='magic'?1.7:1.05,0));
     const branch=tower.branch;
-    const damage=(tower.damage??def.damage)*(branch==='precision'&&tower.type==='gunner'?2.1:1);
-    const range=(tower.range??def.range)*(branch==='precision'&&tower.type==='gunner'?1.25:1);
+    const damage=tower.damage??def.damage;
     tower.cooldown=tower.reload??def.reload;
     const direction=target.mesh.position.subtract(origin);
     if(tower.head)tower.targetYaw=Math.atan2(direction.x,direction.z);
@@ -541,7 +540,7 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
     if(gold<45){say('Для специализации требуется 45 золота.');return;}
     t.branch=branch;t.invested+=45;gold-=45;
     if(t.type==='gunner'&&branch==='barrage'){t.damage*=.78;t.reload*=.48;}
-    if(t.type==='gunner'&&branch==='precision'){t.damage*=2.1;t.reload*=1.65;}
+    if(t.type==='gunner'&&branch==='precision'){t.damage*=2.1;t.reload*=1.65;t.range*=1.25;}
     if(t.type==='mortar'&&branch==='shrapnel'){t.damage*=.72;t.range*=1.12;t.splash=3.6;}
     if(t.type==='mortar'&&branch==='siege'){t.damage*=1.65;t.reload*=1.45;t.range*=1.2;t.splash=1.8;}
     if(t.type==='magic'&&branch==='storm'){t.damage*=.82;}
