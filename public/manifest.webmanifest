@@ -1,0 +1,22 @@
+{
+  "id": "./",
+  "name": "Tower Defender",
+  "short_name": "Tower Defender",
+  "description": "Тактическая игра Tower Defense",
+  "lang": "ru",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "landscape",
+  "background_color": "#17221c",
+  "theme_color": "#17221c",
+  "icons": [
+    {
+      "src": "./icons/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
