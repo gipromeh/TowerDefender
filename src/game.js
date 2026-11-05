@@ -286,7 +286,7 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
     }
     part('enemyNose'+id,'sphere',{diameter:.17*scale,segments:6},dark,[0,1.05*scale,.37*scale]);
     part('enemyFang'+id,'cylinder',{diameterTop:0,diameterBottom:.1*scale,height:.2*scale,tessellation:5},eye,[.12*scale,.91*scale,.3*scale]);
-    const legs=[];
+    const legs=[],wings=[];
     for(const side of [-1,1]){
       legs.push(part('enemyLeg'+id+'_'+side,'cylinder',{diameter:.22*scale,height:.43*scale,tessellation:7},dark,[side*.18*scale,.2*scale,0]));
       part('enemyFoot'+id+'_'+side,'box',{width:.28*scale,height:.13*scale,depth:.35*scale},cloth,[side*.18*scale,.045*scale,.1]);
@@ -304,7 +304,7 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
     if(def.flying){
       for(const side of [-1,1]){
         const wingMesh=part('enemyWing'+id+'_'+side,'box',{width:.72,height:.08,depth:.42},wing,[side*.48,.92,-.08]);
-        wing.rotation.z=side*.45;
+        wingMesh.rotation.z=side*.45;wings.push(wingMesh);
       }
     }
     if(baseType==='shaman'){
@@ -317,7 +317,7 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
     const fill=B.MeshBuilder.CreateBox('enemyHealthFill'+id,{width:boss?1.66:.91,height:.075,depth:.08},scene);
     back.material=enemyHealthBackMat;fill.material=boss?enemyBossHealthMat:enemyHealthFillMat;back.isPickable=fill.isPickable=false;
     const hp=def.hp*(1+wave*.12)*(boss?4.5:1);
-    const enemy={mesh:root,barBack:back,barFill:fill,legs,hp,maxHp:hp,distance:0,dead:false,phase:Math.random()*Math.PI*2,type:baseType,boss,flying:!!def.flying,armor:def.armor||0,regen:def.regen||0,heal:def.healer||false,healTimer:1.5,speed:def.speed*(1+wave*.012),baseDamage:def.damage,reward:def.reward*(boss?5:1),slow:0,scale};
+    const enemy={mesh:root,barBack:back,barFill:fill,legs,wings,hp,maxHp:hp,distance:0,dead:false,phase:Math.random()*Math.PI*2,type:baseType,boss,flying:!!def.flying,armor:def.armor||0,regen:def.regen||0,heal:def.healer||false,healTimer:1.5,speed:def.speed*(1+wave*.012),baseDamage:def.damage,reward:def.reward*(boss?5:1),slow:0,scale};
     enemies.push(enemy);
     spawnBurst(new B.Vector3(p.x,.25,p.z),'spawn');
     if(boss)say('БОСС-ВОЛНА '+wave+'! На дороге появился вожак орков!');
@@ -425,19 +425,19 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
       if(enemy.slow>0)enemy.slow=Math.max(0,enemy.slow-delta);
       const p=pointAt(enemy.distance),ahead=pointAt(Math.min(pathLength,enemy.distance+.12)),behind=pointAt(Math.max(0,enemy.distance-.12));
       const tangent=ahead.subtract(behind),gait=Math.sin(enemy.distance*5.8+enemy.phase);
-      const healerNearby=enemies.some(other=>other!==enemy&&!other.dead&&other.heal&&B.Vector3.Distance(other.mesh.position,enemy.mesh.position)<3.2);
-      if(enemy.heal&&Math.floor(performance.now()/1000)%2===0){
+      if(enemy.heal){
         enemy.healTimer-=delta;
-      if(enemy.heal&&enemy.healTimer<=0){
-        enemies.forEach(other=>{if(other!==enemy&&!other.dead&&B.Vector3.Distance(other.mesh.position,enemy.mesh.position)<3.2)other.hp=Math.min(other.maxHp,other.hp+14);});
-        enemy.healTimer=1.8;
-        spawnBurst(enemy.mesh.position,'spawn');
-      }
+        if(enemy.healTimer<=0){
+          enemies.forEach(other=>{if(other!==enemy&&!other.dead&&B.Vector3.Distance(other.mesh.position,enemy.mesh.position)<3.2)other.hp=Math.min(other.maxHp,other.hp+14);});
+          enemy.healTimer=1.8;
+          spawnBurst(enemy.mesh.position,'spawn');
+        }
       }
       const altitude=enemy.flying?1.75+Math.sin(performance.now()*.004+enemy.phase)*.14:.18;
       enemy.mesh.position.set(p.x,altitude+Math.abs(gait)*.045,p.z);
       enemy.mesh.rotation.y=Math.atan2(tangent.x,tangent.z);
       enemy.legs.forEach((leg,index)=>{leg.rotation.x=(index===0?1:-1)*gait*.62;});
+      enemy.wings.forEach((wing,index)=>{wing.rotation.z=(index===0?-1:1)*(.45+Math.sin(performance.now()*.018+enemy.phase)*.42);});
       enemy.barBack.position.set(p.x,altitude+1.55*enemy.scale,p.z);enemy.barFill.position.set(p.x-.02,altitude+1.55*enemy.scale,p.z);
       enemy.barFill.scaling.x=Math.max(.01,enemy.hp/enemy.maxHp);
     }
