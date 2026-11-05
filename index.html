@@ -78,7 +78,7 @@ html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#17221c;fon
 <span>Площадка: <strong id="selectedPad">—</strong></span>
 <div class="spellRow"><button id="frostSpell" type="button">Ледяная буря</button><button id="meteorSpell" type="button">Метеорит</button></div>
 <div id="spellStatus">Ледяная буря готова · Метеор готов</div>
-<div id="campaignStatus">Кампания · карта 1 · 0/10</div>
+<div id="campaignStatus">Кампания · карта 1 · 0/10</div><div id="achievementStatus">Достижения: пока нет</div>
 <div id="wavePreview">Состав следующей волны появится перед началом.</div>
 <div id="gameMessage" role="status" aria-live="polite">Нажмите на площадку, чтобы выбрать башню.</div>
 </div>
@@ -98,7 +98,7 @@ html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#17221c;fon
 </div>
 <div id="branchPanel" hidden><button id="branchA" type="button">Специализация A</button><button id="branchB" type="button">Специализация B</button></div>
 </section>
-<section id="victoryScreen" hidden><div class="victoryCard"><div class="introKicker">Кампания пройдена</div><h2>ПОБЕДА!</h2><p>Крепость удержана. Следующий регион открыт.</p><button id="nextMap" type="button">Перейти к следующей карте</button></div></section>
+<section id="victoryScreen" hidden><div class="victoryCard"><div class="introKicker">Кампания пройдена</div><h2>ПОБЕДА!</h2><p id="victoryStats">Регион очищен.</p><button id="nextMap" type="button">Перейти к следующей карте</button></div></section>
 <canvas id="renderCanvas"></canvas>
 <script type="module" src="./src/main.js"></script>
 </body>
