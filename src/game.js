@@ -362,10 +362,10 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
     }
     for(const effect of [...effects]){
       effect.life-=delta;const t=1-Math.max(0,effect.life)/effect.maxLife;
-      if(effect.kind==='ring'){const scale=1+t*(effect.maxLife>.5?5.5:3.2);effect.mesh.scaling.set(scale,scale,scale);effect.mesh.material.alpha=Math.max(0,1-t);}
-      else if(effect.kind==='flash'){effect.mesh.scaling.setAll(1+t*2.8);effect.mesh.material.alpha=Math.max(0,1-t);}
-      else if(effect.kind==='dust'){effect.mesh.scaling.set(1+t*3,.25+t*.8,1+t*3);effect.mesh.material.alpha=Math.max(0,.48*(1-t));}
-      else if(effect.kind==='particle'){effect.mesh.position.addInPlace(effect.velocity.scale(delta));effect.velocity.y-=5.5*delta;effect.mesh.rotation.x+=effect.spin*delta;effect.mesh.rotation.z+=effect.spin*.7*delta;effect.mesh.material.alpha=Math.max(0,1-t);}
+      if(effect.kind==='ring'){const scale=1+t*(effect.maxLife>.5?5.5:3.2);effect.mesh.scaling.set(scale,scale,scale);effect.mesh.visibility=Math.max(0,1-t);}
+      else if(effect.kind==='flash'){effect.mesh.scaling.setAll(1+t*2.8);effect.mesh.visibility=Math.max(0,1-t);}
+      else if(effect.kind==='dust'){effect.mesh.scaling.set(1+t*3,.25+t*.8,1+t*3);effect.mesh.visibility=Math.max(0,1-t);}
+      else if(effect.kind==='particle'){effect.mesh.position.addInPlace(effect.velocity.scale(delta));effect.velocity.y-=5.5*delta;effect.mesh.rotation.x+=effect.spin*delta;effect.mesh.rotation.z+=effect.spin*.7*delta;effect.mesh.visibility=Math.max(0,1-t);}
       if(effect.life<=0){effect.mesh.dispose();effects.splice(effects.indexOf(effect),1);}
     }
     if(active&&spawnLeft===0&&enemies.length===0){
