@@ -60,7 +60,7 @@ for(let i=0;i<34;i++){
 
 // Winding road from spawn to castle.
 const maxUnlockedMap=Math.max(0,Math.min(2,Number(localStorage.getItem('tdefUnlockedMap')||0)));
-const mapId=Math.max(0,Math.min(maxUnlockedMap,2,Number(new URLSearchParams(location.search).get('map')||0)));
+const mapId=Math.max(0,Math.min(maxUnlockedMap,2,Number(new URLSearchParams(location.search).get('map')||0)||0));
 const routePoints=[
  [
   [-15,0.17,4.9],[-11.4,0.17,4.7],[-8.4,0.17,2.9],[-7.8,0.17,-0.1],
