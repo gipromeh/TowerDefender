@@ -38,7 +38,7 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
   const pathLength=lengths.at(-1), enemies=[],towers=[],projectiles=[],effects=[];
   let gold=CONFIG.startingGold,baseHealth=CONFIG.baseHealth,wave=0,kills=0;
   let spawnLeft=0,spawnTimer=0,active=false,paused=false,speed=1,selectedPad=-1,gameOver=false,started=false,intermissionLeft=0,intermissionShown=0,countdownLeft=0,countdownShown=0;
-  let spawnQueue=[],frostCooldown=0,meteorCooldown=0,frostTime=0,selectedMap=Math.max(0,Math.min(2,Number(localStorage.getItem('tdefUnlockedMap')||0),Number(new URLSearchParams(location.search).get('map')||0)||0));
+  let spawnQueue=[],frostCooldown=0,meteorCooldown=0,selectedMap=Math.max(0,Math.min(2,Number(localStorage.getItem('tdefUnlockedMap')||0),Number(new URLSearchParams(location.search).get('map')||0)||0));
   const maxCampaignWaves=CONFIG.campaignWaves,unlockedMap=Number(localStorage.getItem('tdefUnlockedMap')||0);
   const mapNames=['Зелёные холмы','Северный перевал','Затонувшие руины'];
   const achievements=JSON.parse(localStorage.getItem('tdefAchievements')||'[]');
@@ -416,13 +416,13 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
       }
       return;
     }
-    frostCooldown=Math.max(0,frostCooldown-delta);meteorCooldown=Math.max(0,meteorCooldown-delta);frostTime=Math.max(0,frostTime-delta);
+    frostCooldown=Math.max(0,frostCooldown-delta);meteorCooldown=Math.max(0,meteorCooldown-delta);
     if(ui.frost)ui.frost.disabled=frostCooldown>0||!active||gameOver;
     if(ui.meteor)ui.meteor.disabled=meteorCooldown>0||!active||gameOver;
     if(ui.spellStatus)ui.spellStatus.textContent=(frostCooldown>0?'Лёд '+Math.ceil(frostCooldown)+'с':'Лёд готов')+' · '+(meteorCooldown>0?'Метеор '+Math.ceil(meteorCooldown)+'с':'Метеор готов');
     if(spawnLeft>0){spawnTimer-=delta;while(spawnLeft>0&&spawnTimer<=0){spawnEnemy(spawnQueue.shift()||'goblin');spawnLeft--;spawnTimer+=CONFIG.spawnInterval;}}
     for(const enemy of [...enemies]){
-      enemy.distance+=(enemy.speed*(enemy.slow>0?.48:1)*(frostTime>0?.42:1))*delta;
+      enemy.distance+=(enemy.speed*(enemy.slow>0?.48:1))*delta;
       if(enemy.distance>=pathLength){removeEnemy(enemy,true);continue;}
       if(enemy.regen>0)enemy.hp=Math.min(enemy.maxHp,enemy.hp+enemy.regen*delta);
       if(enemy.slow>0)enemy.slow=Math.max(0,enemy.slow-delta);
@@ -556,7 +556,7 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
   if(ui.branchA)ui.branchA.addEventListener('click',()=>specialize(({gunner:'barrage',mortar:'shrapnel',magic:'storm'})[towers.find(t=>t.index===selectedPad)?.type]));
   if(ui.branchB)ui.branchB.addEventListener('click',()=>specialize(({gunner:'precision',mortar:'siege',magic:'frost'})[towers.find(t=>t.index===selectedPad)?.type]));
   function castFrost(){
-    if(!active||frostCooldown>0||gameOver)return;frostCooldown=28;frostTime=5.5;
+    if(!active||frostCooldown>0||gameOver)return;frostCooldown=28;
     const center=pointAt(pathLength*.55);spawnBurst(center,'mortar');say('Ледяная буря! Все наземные враги замедлены.');
     enemies.forEach(e=>{if(!e.flying)e.slow=Math.max(e.slow,5.5);});refresh();
   }
