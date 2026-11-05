@@ -71,8 +71,8 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
     ui.gold.textContent=gold;ui.base.textContent=baseHealth;ui.wave.textContent=wave;ui.kills.textContent=kills;
     ui.start.hidden=true;ui.start.disabled=true;ui.pause.disabled=!active;ui.pause.textContent=paused?'Продолжить':'Пауза';
     ui.speed.disabled=!active;ui.selected.textContent=selectedPad<0?'—':String(selectedPad+1);
-    if(ui.frost)ui.frost.disabled=frostCooldown>0||gameOver;
-    if(ui.meteor)ui.meteor.disabled=meteorCooldown>0||gameOver;
+    if(ui.frost)ui.frost.disabled=!active||frostCooldown>0||gameOver;
+    if(ui.meteor)ui.meteor.disabled=!active||meteorCooldown>0||gameOver;
     if(ui.spellStatus)ui.spellStatus.textContent=(frostCooldown>0?'Лёд '+Math.ceil(frostCooldown)+'с':'Лёд готов')+' · '+(meteorCooldown>0?'Метеор '+Math.ceil(meteorCooldown)+'с':'Метеор готов');
     if(ui.campaign)ui.campaign.textContent='Кампания · '+mapNames[selectedMap]+' · '+wave+'/'+maxCampaignWaves;
     if(ui.achievement)ui.achievement.textContent='Достижения: '+(achievements.length?achievements.join(' · '):'пока нет');
@@ -417,6 +417,9 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
       return;
     }
     frostCooldown=Math.max(0,frostCooldown-delta);meteorCooldown=Math.max(0,meteorCooldown-delta);frostTime=Math.max(0,frostTime-delta);
+    if(ui.frost)ui.frost.disabled=frostCooldown>0||!active||gameOver;
+    if(ui.meteor)ui.meteor.disabled=meteorCooldown>0||!active||gameOver;
+    if(ui.spellStatus)ui.spellStatus.textContent=(frostCooldown>0?'Лёд '+Math.ceil(frostCooldown)+'с':'Лёд готов')+' · '+(meteorCooldown>0?'Метеор '+Math.ceil(meteorCooldown)+'с':'Метеор готов');
     if(spawnLeft>0){spawnTimer-=delta;while(spawnLeft>0&&spawnTimer<=0){spawnEnemy(spawnQueue.shift()||'goblin');spawnLeft--;spawnTimer+=CONFIG.spawnInterval;}}
     for(const enemy of [...enemies]){
       enemy.distance+=(enemy.speed*(enemy.slow>0?.48:1)*(frostTime>0?.42:1))*delta;
@@ -553,12 +556,12 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
   if(ui.branchA)ui.branchA.addEventListener('click',()=>specialize(({gunner:'barrage',mortar:'shrapnel',magic:'storm'})[towers.find(t=>t.index===selectedPad)?.type]));
   if(ui.branchB)ui.branchB.addEventListener('click',()=>specialize(({gunner:'precision',mortar:'siege',magic:'frost'})[towers.find(t=>t.index===selectedPad)?.type]));
   function castFrost(){
-    if(frostCooldown>0||gameOver)return;frostCooldown=28;frostTime=5.5;
+    if(!active||frostCooldown>0||gameOver)return;frostCooldown=28;frostTime=5.5;
     const center=pointAt(pathLength*.55);spawnBurst(center,'mortar');say('Ледяная буря! Все наземные враги замедлены.');
     enemies.forEach(e=>{if(!e.flying)e.slow=Math.max(e.slow,5.5);});refresh();
   }
   function castMeteor(){
-    if(meteorCooldown>0||gameOver)return;meteorCooldown=36;
+    if(!active||meteorCooldown>0||gameOver)return;meteorCooldown=36;
     const center=pointAt(pathLength*.62);spawnBurst(center,'mortar');
     enemies.filter(e=>!e.dead&&B.Vector3.Distance(e.mesh.position,center)<4.2).forEach(e=>applyDamage(e,95,true));
     say('Метеоритный удар! Урон по области.');refresh();
