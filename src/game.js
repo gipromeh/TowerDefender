@@ -163,7 +163,7 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
     else parts=createMagic(root,index);
     const ring=mesh(root,'rangeRing'+index,'torus',{diameter:def.range*2,thickness:.025,tessellation:72},material('range'+index,def.color,true,.25),[0,.035,0]);
     ring.isVisible=false;
-    const tower={index,type,root,head:parts.head,barrel:parts.barrel,ring,cooldown:0,level:1,invested:def.cost,upgradeVisuals:[],targetYaw:0,priority:'first',branch:null};
+    const tower={index,type,root,head:parts.head,barrel:parts.barrel,ring,cooldown:0,level:1,invested:def.cost,upgradeVisuals:[],targetYaw:0,priority:'first',branch:null,splash:def.splash||0};
     animateScale(root,.04,1,.46);
     return tower;
   }
@@ -184,7 +184,7 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
       towers.forEach(t=>{t.ring.isVisible=t===tower;});
       const def=TOWERS[tower.type],upgradeCost=CONFIG.upgradeCosts[tower.level-1];
       ui.menuTitle.textContent=def.name+' · уровень '+tower.level;
-      if(ui.targetPriority)ui.targetPriority.value=tower.priority||'first';
+      if(ui.targetPriority){ui.targetPriority.value=tower.priority||'first';ui.targetPriority.hidden=false;}
       if(ui.branchPanel)ui.branchPanel.hidden=tower.level<2||!!tower.branch;
       if(ui.branchA&&ui.branchB){
         ui.branchA.textContent=tower.type==='gunner'?'Шквальный огонь':tower.type==='mortar'?'Осколочный заряд':'Цепная молния';
@@ -196,6 +196,8 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
       ui.sell.textContent='Продать · '+Math.floor(tower.invested*CONFIG.sellRate);
       tower.ring.isVisible=true;
     }else{
+      if(ui.targetPriority)ui.targetPriority.hidden=true;
+      if(ui.branchPanel)ui.branchPanel.hidden=true;
       ui.menuInfo.textContent='Выберите тип башни для строительства';
       towers.forEach(t=>t.ring.isVisible=false);
     }
@@ -298,10 +300,16 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
     const backMat=material('enemyBack'+id,'#351e1e'),fillMat=material('enemyFill'+id,boss?'#f04b55':'#68d36e');
     back.material=backMat;fill.material=fillMat;back.isPickable=fill.isPickable=false;
     const hp=def.hp*(1+wave*.12)*(boss?4.5:1);
-    const enemy={mesh:root,barBack:back,barFill:fill,legs,hp,maxHp:hp,distance:0,dead:false,phase:Math.random()*Math.PI*2,type:baseType,boss,flying:!!def.flying,armor:def.armor||0,regen:def.regen||0,heal:def.healer||false,speed:def.speed*(1+wave*.012),baseDamage:def.damage,reward:def.reward*(boss?5:1),slow:0,scale};
+    const enemy={mesh:root,barBack:back,barFill:fill,legs,hp,maxHp:hp,distance:0,dead:false,phase:Math.random()*Math.PI*2,type:baseType,boss,flying:!!def.flying,armor:def.armor||0,regen:def.regen||0,heal:def.healer||false,healTimer:1.5,speed:def.speed*(1+wave*.012),baseDamage:def.damage,reward:def.reward*(boss?5:1),slow:0,scale};
     enemies.push(enemy);
     spawnBurst(new B.Vector3(p.x,.25,p.z),'spawn');
     if(boss)say('БОСС-ВОЛНА '+wave+'! На дороге появился вожак орков!');
+  }
+  function applyDamage(enemy,amount,ignoreArmor=false){
+    if(!enemy||enemy.dead)return;
+    const actual=amount*(ignoreArmor?1:1-(enemy.armor||0));
+    enemy.hp-=actual;
+    if(enemy.hp<=0)removeEnemy(enemy);
   }
   function removeEnemy(enemy,reachedBase=false){
     if(enemy.dead)return;enemy.dead=true;
@@ -357,11 +365,11 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
       const candidates=enemies.filter(e=>!e.dead&&B.Vector3.Distance(e.mesh.position,target.mesh.position)<(branch==='frost'?4:3))
         .sort((a,b)=>B.Vector3.Distance(a.mesh.position,target.mesh.position)-B.Vector3.Distance(b.mesh.position,target.mesh.position)).slice(0,chainCount);
       let previous=origin;
-      candidates.forEach((enemy,i)=>{addBolt(previous,enemy.mesh.position,branch==='frost'?'#78dfff':'#9e68ff');enemy.hp-=damage*Math.pow(.7,i);if(branch==='frost')enemy.slow=Math.max(enemy.slow,2.2);previous=enemy.mesh.position.clone();if(enemy.hp<=0)removeEnemy(enemy);});
+      candidates.forEach((enemy,i)=>{addBolt(previous,enemy.mesh.position,branch==='frost'?'#78dfff':'#9e68ff');applyDamage(enemy,damage*Math.pow(.7,i));if(branch==='frost')enemy.slow=Math.max(enemy.slow,2.2);previous=enemy.mesh.position.clone();});
     }else{
       const projectile=B.MeshBuilder.CreateSphere(tower.type+'Projectile',{diameter:tower.type==='mortar'?.34:.19,segments:10},scene);
       projectile.position.copyFrom(origin);projectile.material=tower.type==='mortar'?mortarMat:bulletMat;projectile.isPickable=false;
-      projectiles.push({mesh:projectile,target,damage,speed:tower.type==='mortar'?def.projectileSpeed:def.projectileSpeed,type:tower.type,origin:origin.clone(),elapsed:0});
+      projectiles.push({mesh:projectile,target,damage,speed:def.projectileSpeed,type:tower.type,origin:origin.clone(),elapsed:0,splash:tower.splash||def.splash||0});
     }
   }
   function update(dt){
@@ -394,7 +402,12 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
       const tangent=ahead.subtract(behind),gait=Math.sin(enemy.distance*5.8+enemy.phase);
       const healerNearby=enemies.some(other=>other!==enemy&&!other.dead&&other.heal&&B.Vector3.Distance(other.mesh.position,enemy.mesh.position)<3.2);
       if(enemy.heal&&Math.floor(performance.now()/1000)%2===0){
-        enemies.forEach(other=>{if(other!==enemy&&!other.dead&&B.Vector3.Distance(other.mesh.position,enemy.mesh.position)<3.2)other.hp=Math.min(other.maxHp,other.hp+8*delta);});
+        enemy.healTimer-=delta;
+      if(enemy.heal&&enemy.healTimer<=0){
+        enemies.forEach(other=>{if(other!==enemy&&!other.dead&&B.Vector3.Distance(other.mesh.position,enemy.mesh.position)<3.2)other.hp=Math.min(other.maxHp,other.hp+14);});
+        enemy.healTimer=1.8;
+        spawnBurst(enemy.mesh.position,'spawn');
+      }
       }
       const altitude=enemy.flying?1.75+Math.sin(performance.now()*.004+enemy.phase)*.14:.18;
       enemy.mesh.position.set(p.x,altitude+Math.abs(gait)*.045,p.z);
@@ -424,15 +437,15 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
         shot.mesh.position.copyFrom(pos);
         if(t>=1){
           const impact=destination.clone();
-          const nearby=enemies.filter(e=>!e.dead&&B.Vector3.Distance(e.mesh.position,impact)<=TOWERS.mortar.splash);
+          const nearby=enemies.filter(e=>!e.dead&&B.Vector3.Distance(e.mesh.position,impact)<=(shot.splash||TOWERS.mortar.splash));
           spawnBurst(impact,'mortar');
-          nearby.forEach(e=>{e.hp-=shot.damage;if(e.hp<=0)removeEnemy(e);});
+          nearby.forEach(e=>applyDamage(e,shot.damage));
           shot.mesh.dispose();projectiles.splice(projectiles.indexOf(shot),1);
         }
       }else{
         const diff=destination.subtract(shot.mesh.position),step=shot.speed*delta;
         if(diff.length()<=step){
-          shot.target.hp-=shot.damage;if(shot.target.hp<=0)removeEnemy(shot.target);
+          applyDamage(shot.target,shot.damage);
           shot.mesh.dispose();projectiles.splice(projectiles.indexOf(shot),1);
         }else shot.mesh.position.addInPlace(diff.normalize().scale(step));
       }
@@ -492,11 +505,12 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
   if(ui.targetPriority)ui.targetPriority.addEventListener('change',()=>{const t=towers.find(x=>x.index===selectedPad);if(t)t.priority=ui.targetPriority.value;});
   function specialize(branch){
     const t=towers.find(x=>x.index===selectedPad);if(!t||t.level<2||t.branch)return;
-    t.branch=branch;t.invested+=45;gold=Math.max(0,gold-45);
+    if(gold<45){say('Для специализации требуется 45 золота.');return;}
+    t.branch=branch;t.invested+=45;gold-=45;
     if(t.type==='gunner'&&branch==='barrage'){t.damage*=.78;t.reload*=.48;}
     if(t.type==='gunner'&&branch==='precision'){t.damage*=2.1;t.reload*=1.65;}
-    if(t.type==='mortar'&&branch==='shrapnel'){t.damage*=.72;t.range*=1.12;}
-    if(t.type==='mortar'&&branch==='siege'){t.damage*=1.65;t.reload*=1.45;t.range*=1.2;}
+    if(t.type==='mortar'&&branch==='shrapnel'){t.damage*=.72;t.range*=1.12;t.splash=3.6;}
+    if(t.type==='mortar'&&branch==='siege'){t.damage*=1.65;t.reload*=1.45;t.range*=1.2;t.splash=1.8;}
     if(t.type==='magic'&&branch==='storm'){t.damage*=.82;}
     if(t.type==='magic'&&branch==='frost'){t.damage*=.9;}
     if(ui.branchPanel)ui.branchPanel.hidden=true;
@@ -512,7 +526,7 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
   function castMeteor(){
     if(meteorCooldown>0||gameOver)return;meteorCooldown=36;
     const center=pointAt(pathLength*.62);spawnBurst(center,'mortar');
-    enemies.filter(e=>!e.dead&&B.Vector3.Distance(e.mesh.position,center)<4.2).forEach(e=>{e.hp-=95;if(e.hp<=0)removeEnemy(e);});
+    enemies.filter(e=>!e.dead&&B.Vector3.Distance(e.mesh.position,center)<4.2).forEach(e=>applyDamage(e,95,true));
     say('Метеоритный удар! Урон по области.');refresh();
   }
   if(ui.frost)ui.frost.addEventListener('click',castFrost);
