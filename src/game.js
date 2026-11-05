@@ -5,11 +5,17 @@ const TOWERS = Object.freeze({
   mortar: { name:'Мортира', cost:100, range:9, damage:50, reload:3, projectileSpeed:10, splash:2.5, color:'#7f8990' },
   magic: { name:'Магическая', cost:90, range:4, damage:15, reload:1, chain:3, color:'#9d7be8' }
 });
+const ENEMY_TYPES = Object.freeze({
+  goblin:{name:'Гоблин',hp:40,speed:2,reward:10,damage:1,armor:0,color:'#659b45'},
+  orc:{name:'Орк',hp:115,speed:1.15,reward:18,damage:2,armor:.32,color:'#8c6843'},
+  shaman:{name:'Шаман',hp:72,speed:1.35,reward:22,damage:1,armor:0,color:'#8e69bd',healer:true},
+  troll:{name:'Тролль',hp:310,speed:.72,reward:35,damage:4,armor:.48,color:'#668b55',regen:5},
+  flyer:{name:'Летучий налётчик',hp:58,speed:2.8,reward:16,damage:2,armor:0,color:'#b5a1cc',flying:true}
+});
 const CONFIG = Object.freeze({
-  startingGold:100, baseHealth:20,
-  enemiesPerWave:wave=>8+wave*2, spawnInterval:0.85,
-  enemy:{hp:40,speed:2,reward:10,baseDamage:1},
-  upgradeCosts:[40,60], sellRate:0.5
+  startingGold:190, baseHealth:25,
+  enemiesPerWave:wave=>8+wave*2, spawnInterval:0.82,
+  upgradeCosts:[55,85], sellRate:0.5, campaignWaves:10
 });
 
 export function attachGame({B:Babylon,scene,engine,curve,pads}) {
@@ -21,13 +27,20 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
     selected:$('selectedPad'),message:$('gameMessage'),
     menu:$('contextMenu'),menuTitle:$('contextTitle'),menuInfo:$('contextInfo'),
     buildButtons:[...document.querySelectorAll('[data-build]')],
-    upgrade:$('upgradeTower'),sell:$('sellTower'),close:$('closeContext')
+    upgrade:$('upgradeTower'),sell:$('sellTower'),close:$('closeContext'),
+    targetPriority:$('targetPriority'),branchPanel:$('branchPanel'),
+    branchA:$('branchA'),branchB:$('branchB'),wavePreview:$('wavePreview'),
+    frost:$('frostSpell'),meteor:$('meteorSpell'),spellStatus:$('spellStatus'),
+    campaign:$('campaignStatus'),victory:$('victoryScreen'),victoryNext:$('nextMap')
   };
   const path=curve.map(p=>p.clone()), lengths=[0];
   for(let i=1;i<path.length;i++)lengths.push(lengths[i-1]+B.Vector3.Distance(path[i-1],path[i]));
   const pathLength=lengths.at(-1), enemies=[],towers=[],projectiles=[],effects=[];
   let gold=CONFIG.startingGold,baseHealth=CONFIG.baseHealth,wave=0,kills=0;
   let spawnLeft=0,spawnTimer=0,active=false,paused=false,speed=1,selectedPad=-1,gameOver=false,started=false,intermissionLeft=0,intermissionShown=0,countdownLeft=0,countdownShown=0;
+  let spawnQueue=[],frostCooldown=0,meteorCooldown=0,frostTime=0,selectedMap=Number(new URLSearchParams(location.search).get('map')||0);
+  const maxCampaignWaves=CONFIG.campaignWaves,unlockedMap=Number(localStorage.getItem('tdefUnlockedMap')||0);
+  const spellState={frost:0,meteor:0};
   const materials={},visualAnimations=[];
   function material(name,color,emissive=false,alpha=1){
     const m=new B.StandardMaterial(name,scene);m.diffuseColor=B.Color3.FromHexString(color);
@@ -53,6 +66,10 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
     ui.gold.textContent=gold;ui.base.textContent=baseHealth;ui.wave.textContent=wave;ui.kills.textContent=kills;
     ui.start.hidden=true;ui.start.disabled=true;ui.pause.disabled=!active;ui.pause.textContent=paused?'Продолжить':'Пауза';
     ui.speed.disabled=!active;ui.selected.textContent=selectedPad<0?'—':String(selectedPad+1);
+    if(ui.frost)ui.frost.disabled=frostCooldown>0||gameOver;
+    if(ui.meteor)ui.meteor.disabled=meteorCooldown>0||gameOver;
+    if(ui.spellStatus)ui.spellStatus.textContent=(frostCooldown>0?'Лёд '+Math.ceil(frostCooldown)+'с':'Лёд готов')+' · '+(meteorCooldown>0?'Метеор '+Math.ceil(meteorCooldown)+'с':'Метеор готов');
+    if(ui.campaign)ui.campaign.textContent='Кампания · карта '+(selectedMap+1)+' · '+wave+'/'+maxCampaignWaves;
   }
   function pointAt(distance){
     const d=Math.max(0,Math.min(pathLength,distance));let lo=0,hi=lengths.length-1;
@@ -146,7 +163,7 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
     else parts=createMagic(root,index);
     const ring=mesh(root,'rangeRing'+index,'torus',{diameter:def.range*2,thickness:.025,tessellation:72},material('range'+index,def.color,true,.25),[0,.035,0]);
     ring.isVisible=false;
-    const tower={index,type,root,head:parts.head,barrel:parts.barrel,ring,cooldown:0,level:1,invested:def.cost,upgradeVisuals:[],targetYaw:0};
+    const tower={index,type,root,head:parts.head,barrel:parts.barrel,ring,cooldown:0,level:1,invested:def.cost,upgradeVisuals:[],targetYaw:0,priority:'first',branch:null};
     animateScale(root,.04,1,.46);
     return tower;
   }
@@ -167,6 +184,12 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
       towers.forEach(t=>{t.ring.isVisible=t===tower;});
       const def=TOWERS[tower.type],upgradeCost=CONFIG.upgradeCosts[tower.level-1];
       ui.menuTitle.textContent=def.name+' · уровень '+tower.level;
+      if(ui.targetPriority)ui.targetPriority.value=tower.priority||'first';
+      if(ui.branchPanel)ui.branchPanel.hidden=tower.level<2||!!tower.branch;
+      if(ui.branchA&&ui.branchB){
+        ui.branchA.textContent=tower.type==='gunner'?'Шквальный огонь':tower.type==='mortar'?'Осколочный заряд':'Цепная молния';
+        ui.branchB.textContent=tower.type==='gunner'?'Снайперский ствол':tower.type==='mortar'?'Осадный заряд':'Ледяная печать';
+      }
       ui.menuInfo.textContent='Урон '+Math.round(def.damage*(1+.5*(tower.level-1)))+' · дальность '+(def.range*(1+.1*(tower.level-1))).toFixed(1);
       ui.upgrade.textContent=tower.level>=3?'Максимальный уровень':'Улучшить · '+upgradeCost;
       ui.upgrade.disabled=tower.level>=3||gold<upgradeCost;
@@ -205,37 +228,80 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
     gold+=refund;tower.root.dispose();towers.splice(i,1);hideMenu();selectedPad=-1;
     say('Башня продана. Возвращено '+refund+' золота.');refresh();
   }
-  function spawnEnemy(){
-    const id=kills+enemies.length+wave*100,root=new B.TransformNode('goblin_'+id,scene);
+  function waveComposition(w){
+    const count=CONFIG.enemiesPerWave(w),queue=[];
+    for(let i=0;i<count;i++){
+      let type='goblin';
+      if(w>=2&&i%5===4)type='orc';
+      if(w>=3&&i%7===5)type='shaman';
+      if(w>=4&&i%6===3)type='flyer';
+      if(w>=5&&i%9===7)type='troll';
+      if(w>=6&&i%4===2)type=['orc','shaman','flyer','troll'][(i+w)%4];
+      queue.push(type);
+    }
+    if(w%5===0)queue.splice(Math.floor(queue.length*.55),0,'boss');
+    return queue;
+  }
+  function spawnEnemy(type='goblin'){
+    const boss=type==='boss',baseType=boss?'troll':type,def=ENEMY_TYPES[baseType]||ENEMY_TYPES.goblin;
+    const id=kills+enemies.length+wave*100,root=new B.TransformNode('enemy_'+baseType+'_'+id,scene);
     const part=(name,kind,opts,mat,pos)=>{
       const m=kind==='sphere'?B.MeshBuilder.CreateSphere(name,opts,scene):kind==='box'?B.MeshBuilder.CreateBox(name,opts,scene):B.MeshBuilder.CreateCylinder(name,opts,scene);
       m.parent=root;m.position.set(...pos);m.material=mat;m.isPickable=false;return m;
     };
-    part('goblinBody'+id,'sphere',{diameter:1,segments:8},goblinCloth,[0,.53,0]).scaling.set(.48,.58,.34);
-    part('goblinBelly'+id,'sphere',{diameter:.55,segments:8},goblinSkin,[0,.57,.22]).scaling.set(.78,.78,.55);
-    part('goblinHead'+id,'sphere',{diameter:.62,segments:8},goblinSkin,[0,1.12,.02]).scaling.set(.9,1.02,.86);
+    const skin=material('enemySkin_'+id,def.color,boss);
+    const dark=material('enemyDark_'+id,boss?'#292b36':'#35432f');
+    const cloth=material('enemyCloth_'+id,boss?'#6d2634':baseType==='orc'?'#65462f':'#75412f');
+    const eye=material('enemyEye_'+id,boss?'#ffb24a':'#f1d66b',true);
+    const scale=boss?1.75:baseType==='troll'?1.35:baseType==='flyer'?.82:baseType==='orc'?1.18:1;
+    part('enemyTorso'+id,'sphere',{diameter:1,segments:10},cloth,[0,.55,0]).scaling.set(.5*scale,.6*scale,.36*scale);
+    part('enemyBelly'+id,'sphere',{diameter:.55,segments:8},skin,[0,.57*scale,.22*scale]).scaling.set(.8*scale,.8*scale,.55*scale);
+    part('enemyHead'+id,'sphere',{diameter:.62,segments:10},skin,[0,1.13*scale,.02]).scaling.set(scale,scale,scale);
     for(const side of [-1,1]){
-      const ear=part('goblinEar'+id+'_'+side,'cylinder',{diameterTop:0,diameterBottom:.28,height:.52,tessellation:5},goblinSkin,[side*.39,1.2,.02]);
+      const ear=part('enemyEar'+id+'_'+side,'cylinder',{diameterTop:0,diameterBottom:.28*scale,height:.52*scale,tessellation:5},skin,[side*.4*scale,1.2*scale,.02]);
       ear.rotation.z=-side*.95;
-      part('goblinEye'+id+'_'+side,'sphere',{diameter:.105,segments:8},goblinEye,[side*.15,1.18,.285]);
-      part('goblinPupil'+id+'_'+side,'sphere',{diameter:.045,segments:6},goblinDark,[side*.15,1.18,.33]);
-      const arm=part('goblinArm'+id+'_'+side,'cylinder',{diameter:.2,height:.58,tessellation:7},goblinSkin,[side*.42,.68,.02]);arm.rotation.z=side*.45;
+      part('enemyEye'+id+'_'+side,'sphere',{diameter:.11*scale,segments:8},eye,[side*.15*scale,1.18*scale,.29*scale]);
+      const arm=part('enemyArm'+id+'_'+side,'cylinder',{diameter:.22*scale,height:.62*scale,tessellation:7},skin,[side*.48*scale,.67*scale,.02]);arm.rotation.z=side*.42;
     }
-    part('goblinNose'+id,'sphere',{diameter:.16,segments:6},goblinDark,[0,1.05,.36]);
-    part('goblinFang'+id,'cylinder',{diameterTop:0,diameterBottom:.09,height:.18,tessellation:5},goblinTooth,[.12,.91,.29]);
-    const club=part('goblinClub'+id,'cylinder',{diameter:.15,height:.72,tessellation:7},goblinLeather,[.52,.65,.12]);club.rotation.z=-.5;
+    part('enemyNose'+id,'sphere',{diameter:.17*scale,segments:6},dark,[0,1.05*scale,.37*scale]);
+    part('enemyFang'+id,'cylinder',{diameterTop:0,diameterBottom:.1*scale,height:.2*scale,tessellation:5},eye,[.12*scale,.91*scale,.3*scale]);
     const legs=[];
     for(const side of [-1,1]){
-      legs.push(part('goblinLeg'+id+'_'+side,'cylinder',{diameter:.22,height:.43,tessellation:7},goblinDark,[side*.18,.2,0]));
-      part('goblinFoot'+id+'_'+side,'box',{width:.27,height:.12,depth:.34},goblinLeather,[side*.18,.045,.1]);
+      legs.push(part('enemyLeg'+id+'_'+side,'cylinder',{diameter:.22*scale,height:.43*scale,tessellation:7},dark,[side*.18*scale,.2*scale,0]));
+      part('enemyFoot'+id+'_'+side,'box',{width:.28*scale,height:.13*scale,depth:.35*scale},cloth,[side*.18*scale,.045*scale,.1]);
     }
-    const p=pointAt(0);root.position.set(p.x,.18,p.z);
-    const back=B.MeshBuilder.CreateBox('enemyHealthBack',{width:.9,height:.09,depth:.07},scene);
-    const fill=B.MeshBuilder.CreateBox('enemyHealthFill',{width:.86,height:.07,depth:.08},scene);
-    const backMat=material('enemyBack'+id,'#351e1e'),fillMat=material('enemyFill'+id,'#68d36e');
+    if(baseType==='orc'||baseType==='troll'||boss){
+      part('enemyShoulderL'+id,'box',{width:.42*scale,height:.28*scale,depth:.48*scale},dark,[-.48*scale,.92*scale,0]);
+      part('enemyShoulderR'+id,'box',{width:.42*scale,height:.28*scale,depth:.48*scale},dark,[.48*scale,.92*scale,0]);
+      part('enemyWeapon'+id,'cylinder',{diameter:.2*scale,height:.95*scale,tessellation:7},dark,[.62*scale,.62*scale,.12]).rotation.z=-.5;
+    }else if(baseType==='shaman'){
+      part('shamanStaff'+id,'cylinder',{diameter:.09,height:1.5,tessellation:7},dark,[.58,.72,.05]).rotation.z=-.15;
+      part('shamanOrb'+id,'sphere',{diameter:.28,segments:8},eye,[.58,1.5,.05]);
+    }else{
+      part('enemyClub'+id,'cylinder',{diameter:.14,height:.72,tessellation:7},dark,[.52,.65,.12]).rotation.z=-.5;
+    }
+    if(def.flying){
+      const wingMat=material('enemyWing_'+id,'#6e587d');
+      for(const side of [-1,1]){
+        const wing=part('enemyWing'+id+'_'+side,'box',{width:.72,height:.08,depth:.42},wingMat,[side*.48,.92,-.08]);
+        wing.rotation.z=side*.45;
+      }
+    }
+    if(baseType==='shaman'){
+      const aura=B.MeshBuilder.CreateTorus('shamanAura'+id,{diameter:1.15,thickness:.035,tessellation:24},scene);
+      aura.parent=root;aura.position.y=.18;aura.material=eye;aura.isPickable=false;
+    }
+    const p=pointAt(0);root.position.set(p.x,def.flying?1.7:.18,p.z);
+    root.scaling.setAll(scale);
+    const back=B.MeshBuilder.CreateBox('enemyHealthBack'+id,{width:boss?1.7:.95,height:.1,depth:.07},scene);
+    const fill=B.MeshBuilder.CreateBox('enemyHealthFill'+id,{width:boss?1.66:.91,height:.075,depth:.08},scene);
+    const backMat=material('enemyBack'+id,'#351e1e'),fillMat=material('enemyFill'+id,boss?'#f04b55':'#68d36e');
     back.material=backMat;fill.material=fillMat;back.isPickable=fill.isPickable=false;
-    enemies.push({mesh:root,barBack:back,barFill:fill,legs,hp:CONFIG.enemy.hp,distance:0,dead:false,phase:Math.random()*Math.PI*2});
+    const hp=def.hp*(1+wave*.12)*(boss?4.5:1);
+    const enemy={mesh:root,barBack:back,barFill:fill,legs,hp,maxHp:hp,distance:0,dead:false,phase:Math.random()*Math.PI*2,type:baseType,boss,flying:!!def.flying,armor:def.armor||0,regen:def.regen||0,heal:def.healer||false,speed:def.speed*(1+wave*.012),baseDamage:def.damage,reward:def.reward*(boss?5:1),slow:0,scale};
+    enemies.push(enemy);
     spawnBurst(new B.Vector3(p.x,.25,p.z),'spawn');
+    if(boss)say('БОСС-ВОЛНА '+wave+'! На дороге появился вожак орков!');
   }
   function removeEnemy(enemy,reachedBase=false){
     if(enemy.dead)return;enemy.dead=true;
@@ -243,8 +309,8 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
     enemy.mesh.dispose();enemy.barBack.dispose();enemy.barFill.dispose();
     if(!reachedBase)spawnBurst(deathPoint,'goblin');
     const i=enemies.indexOf(enemy);if(i>=0)enemies.splice(i,1);
-    if(reachedBase){baseHealth=Math.max(0,baseHealth-CONFIG.enemy.baseDamage);spawnBurst(deathPoint,'base');if(baseHealth===0){gameOver=true;active=false;say('Поражение: база уничтожена.');}}
-    else{gold+=CONFIG.enemy.reward;kills++;}
+    if(reachedBase){baseHealth=Math.max(0,baseHealth-enemy.baseDamage);spawnBurst(deathPoint,'base');if(baseHealth===0){gameOver=true;active=false;say('Поражение: база уничтожена.');}}
+    else{gold+=enemy.reward;kills++;}
     refresh();
   }
   function spawnBurst(position,kind='mortar'){
@@ -280,15 +346,18 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
   }
   function fire(tower,target){
     const def=TOWERS[tower.type],origin=tower.root.position.add(new B.Vector3(0,tower.type==='magic'?1.7:1.05,0));
-    const damage=tower.damage??def.damage,range=tower.range??def.range;
+    const branch=tower.branch;
+    const damage=(tower.damage??def.damage)*(branch==='precision'&&tower.type==='gunner'?2.1:1);
+    const range=(tower.range??def.range)*(branch==='precision'&&tower.type==='gunner'?1.25:1);
     tower.cooldown=tower.reload??def.reload;
     const direction=target.mesh.position.subtract(origin);
     if(tower.head)tower.targetYaw=Math.atan2(direction.x,direction.z);
     if(tower.type==='magic'){
-      const candidates=enemies.filter(e=>!e.dead&&B.Vector3.Distance(e.mesh.position,target.mesh.position)<3)
-        .sort((a,b)=>B.Vector3.Distance(a.mesh.position,target.mesh.position)-B.Vector3.Distance(b.mesh.position,target.mesh.position)).slice(0,def.chain);
+      const chainCount=branch==='storm'?5:def.chain;
+      const candidates=enemies.filter(e=>!e.dead&&B.Vector3.Distance(e.mesh.position,target.mesh.position)<(branch==='frost'?4:3))
+        .sort((a,b)=>B.Vector3.Distance(a.mesh.position,target.mesh.position)-B.Vector3.Distance(b.mesh.position,target.mesh.position)).slice(0,chainCount);
       let previous=origin;
-      candidates.forEach((enemy,i)=>{addBolt(previous,enemy.mesh.position);enemy.hp-=damage*Math.pow(.7,i);previous=enemy.mesh.position.clone();if(enemy.hp<=0)removeEnemy(enemy);});
+      candidates.forEach((enemy,i)=>{addBolt(previous,enemy.mesh.position,branch==='frost'?'#78dfff':'#9e68ff');enemy.hp-=damage*Math.pow(.7,i);if(branch==='frost')enemy.slow=Math.max(enemy.slow,2.2);previous=enemy.mesh.position.clone();if(enemy.hp<=0)removeEnemy(enemy);});
     }else{
       const projectile=B.MeshBuilder.CreateSphere(tower.type+'Projectile',{diameter:tower.type==='mortar'?.34:.19,segments:10},scene);
       projectile.position.copyFrom(origin);projectile.material=tower.type==='mortar'?mortarMat:bulletMat;projectile.isPickable=false;
@@ -314,24 +383,32 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
       }
       return;
     }
-    if(spawnLeft>0){spawnTimer-=delta;while(spawnLeft>0&&spawnTimer<=0){spawnEnemy();spawnLeft--;spawnTimer+=CONFIG.spawnInterval;}}
+    frostCooldown=Math.max(0,frostCooldown-delta);meteorCooldown=Math.max(0,meteorCooldown-delta);frostTime=Math.max(0,frostTime-delta);
+    if(spawnLeft>0){spawnTimer-=delta;while(spawnLeft>0&&spawnTimer<=0){spawnEnemy(spawnQueue.shift()||'goblin');spawnLeft--;spawnTimer+=CONFIG.spawnInterval;}}
     for(const enemy of [...enemies]){
-      enemy.distance+=CONFIG.enemy.speed*delta;
+      enemy.distance+=(enemy.speed*(enemy.slow>0?.48:1)*(frostTime>0?.42:1))*delta;
       if(enemy.distance>=pathLength){removeEnemy(enemy,true);continue;}
+      if(enemy.regen>0)enemy.hp=Math.min(enemy.maxHp,enemy.hp+enemy.regen*delta);
+      if(enemy.slow>0)enemy.slow=Math.max(0,enemy.slow-delta);
       const p=pointAt(enemy.distance),ahead=pointAt(Math.min(pathLength,enemy.distance+.12)),behind=pointAt(Math.max(0,enemy.distance-.12));
       const tangent=ahead.subtract(behind),gait=Math.sin(enemy.distance*5.8+enemy.phase);
-      enemy.mesh.position.set(p.x,.18+Math.abs(gait)*.045,p.z);
+      const healerNearby=enemies.some(other=>other!==enemy&&!other.dead&&other.heal&&B.Vector3.Distance(other.mesh.position,enemy.mesh.position)<3.2);
+      if(enemy.heal&&Math.floor(performance.now()/1000)%2===0){
+        enemies.forEach(other=>{if(other!==enemy&&!other.dead&&B.Vector3.Distance(other.mesh.position,enemy.mesh.position)<3.2)other.hp=Math.min(other.maxHp,other.hp+8*delta);});
+      }
+      const altitude=enemy.flying?1.75+Math.sin(performance.now()*.004+enemy.phase)*.14:.18;
+      enemy.mesh.position.set(p.x,altitude+Math.abs(gait)*.045,p.z);
       enemy.mesh.rotation.y=Math.atan2(tangent.x,tangent.z);
       enemy.legs.forEach((leg,index)=>{leg.rotation.x=(index===0?1:-1)*gait*.62;});
-      enemy.barBack.position.set(p.x,1.68+Math.abs(gait)*.045,p.z);enemy.barFill.position.set(p.x-.02,1.68+Math.abs(gait)*.045,p.z);
-      enemy.barFill.scaling.x=Math.max(.01,enemy.hp/CONFIG.enemy.hp);
+      enemy.barBack.position.set(p.x,altitude+1.55*enemy.scale,p.z);enemy.barFill.position.set(p.x-.02,altitude+1.55*enemy.scale,p.z);
+      enemy.barFill.scaling.x=Math.max(.01,enemy.hp/enemy.maxHp);
     }
     for(const tower of towers){
       if(tower.head){const turn=Math.atan2(Math.sin(tower.targetYaw-tower.head.rotation.y),Math.cos(tower.targetYaw-tower.head.rotation.y));tower.head.rotation.y+=turn*Math.min(1,delta*8);}
       tower.cooldown-=delta;const def=TOWERS[tower.type],range=tower.range??def.range;
       const center=tower.root.position;
-      const target=enemies.filter(e=>!e.dead).filter(e=>B.Vector3.Distance(new B.Vector3(e.mesh.position.x,0,e.mesh.position.z),new B.Vector3(center.x,0,center.z))<=range)
-        .sort((a,b)=>b.distance-a.distance)[0];
+      const target=enemies.filter(e=>!e.dead).filter(e=>!e.flying||tower.type!=='mortar').filter(e=>B.Vector3.Distance(new B.Vector3(e.mesh.position.x,0,e.mesh.position.z),new B.Vector3(center.x,0,center.z))<=range)
+        .sort((a,b)=>tower.priority==='strongest'?b.hp-a.hp:tower.priority==='weakest'?a.hp-b.hp:tower.priority==='last'?a.distance-b.distance:b.distance-a.distance)[0];
       if(target&&tower.cooldown<=0)fire(tower,target);
     }
     for(const shot of [...projectiles]){
@@ -369,9 +446,17 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
       if(effect.life<=0){effect.mesh.dispose();effects.splice(effects.indexOf(effect),1);}
     }
     if(active&&spawnLeft===0&&enemies.length===0){
-      active=false;gold+=20+5*wave;hideMenu();
-      intermissionLeft=5;intermissionShown=5;beginCountdown(5,'Следующая волна');
-      say('Волна '+wave+' отражена. Награда: '+(20+5*wave)+'.');refresh();
+      active=false;gold+=25+8*wave;hideMenu();
+      if(wave>=maxCampaignWaves){
+        gameOver=true;const next=Math.min(2,selectedMap+1);localStorage.setItem('tdefUnlockedMap',String(Math.max(unlockedMap,next)));
+        if(ui.victory)ui.victory.hidden=false;
+        if(ui.victoryNext){ui.victoryNext.disabled=next<=selectedMap;ui.victoryNext.textContent=next<=selectedMap?'Кампания завершена':'Открыта следующая карта · перейти';}
+        say('Победа! Кампания на этой карте завершена.');
+      }else{
+        intermissionLeft=5;intermissionShown=5;beginCountdown(5,'Следующая волна');
+        say('Волна '+wave+' отражена. Награда: '+(25+8*wave)+'.');
+      }
+      refresh();
     }
   }
   function showCountdown(seconds,label){
@@ -386,7 +471,8 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
   function startWave(){
     if(active||gameOver)return;
     started=true;intermissionLeft=0;intermissionShown=0;hideCountdown();hideMenu();
-    wave++;spawnLeft=CONFIG.enemiesPerWave(wave);spawnTimer=0;active=true;paused=false;
+    wave++;spawnQueue=waveComposition(wave);spawnLeft=spawnQueue.length;spawnTimer=0;active=true;paused=false;
+    if(ui.wavePreview)ui.wavePreview.textContent='Волна '+wave+': '+Object.entries(spawnQueue.reduce((a,t)=>(a[t]=(a[t]||0)+1,a),{})).map(([t,n])=>(ENEMY_TYPES[t]?.name||'Босс')+' ×'+n).join(' · ');
     spawnBurst(pointAt(0),'spawn');
     say('Волна '+wave+': гоблины идут к крепости!');refresh();
   }
@@ -403,8 +489,38 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
   ui.introButton.addEventListener('click',enterBattle);
   ui.pause.addEventListener('click',()=>{paused=!paused;refresh();say(paused?'Пауза.':'Волна продолжается.');});
   ui.speed.addEventListener('change',()=>{speed=Number(ui.speed.value)||1;});
+  if(ui.targetPriority)ui.targetPriority.addEventListener('change',()=>{const t=towers.find(x=>x.index===selectedPad);if(t)t.priority=ui.targetPriority.value;});
+  function specialize(branch){
+    const t=towers.find(x=>x.index===selectedPad);if(!t||t.level<2||t.branch)return;
+    t.branch=branch;t.invested+=45;gold=Math.max(0,gold-45);
+    if(t.type==='gunner'&&branch==='barrage'){t.damage*=.78;t.reload*=.48;}
+    if(t.type==='gunner'&&branch==='precision'){t.damage*=2.1;t.reload*=1.65;}
+    if(t.type==='mortar'&&branch==='shrapnel'){t.damage*=.72;t.range*=1.12;}
+    if(t.type==='mortar'&&branch==='siege'){t.damage*=1.65;t.reload*=1.45;t.range*=1.2;}
+    if(t.type==='magic'&&branch==='storm'){t.damage*=.82;}
+    if(t.type==='magic'&&branch==='frost'){t.damage*=.9;}
+    if(ui.branchPanel)ui.branchPanel.hidden=true;
+    say('Специализация башни установлена.');refresh();openMenu(selectedPad);
+  }
+  if(ui.branchA)ui.branchA.addEventListener('click',()=>specialize(({gunner:'barrage',mortar:'shrapnel',magic:'storm'})[towers.find(t=>t.index===selectedPad)?.type]));
+  if(ui.branchB)ui.branchB.addEventListener('click',()=>specialize(({gunner:'precision',mortar:'siege',magic:'frost'})[towers.find(t=>t.index===selectedPad)?.type]));
+  function castFrost(){
+    if(frostCooldown>0||gameOver)return;frostCooldown=28;frostTime=5.5;
+    const center=pointAt(pathLength*.55);spawnBurst(center,'mortar');say('Ледяная буря! Все наземные враги замедлены.');
+    enemies.forEach(e=>{if(!e.flying)e.slow=Math.max(e.slow,5.5);});refresh();
+  }
+  function castMeteor(){
+    if(meteorCooldown>0||gameOver)return;meteorCooldown=36;
+    const center=pointAt(pathLength*.62);spawnBurst(center,'mortar');
+    enemies.filter(e=>!e.dead&&B.Vector3.Distance(e.mesh.position,center)<4.2).forEach(e=>{e.hp-=95;if(e.hp<=0)removeEnemy(e);});
+    say('Метеоритный удар! Урон по области.');refresh();
+  }
+  if(ui.frost)ui.frost.addEventListener('click',castFrost);
+  if(ui.meteor)ui.meteor.addEventListener('click',castMeteor);
+  if(ui.victoryNext)ui.victoryNext.addEventListener('click',()=>{if(selectedMap<2){location.href=location.pathname+'?map='+(selectedMap+1);}});
+  if(ui.campaign)ui.campaign.textContent='Кампания · карта '+(selectedMap+1)+' · 0/'+maxCampaignWaves;
   scene.onBeforeRenderObservable.add(()=>update(Math.min(engine.getDeltaTime()/1000,.05)));
   document.addEventListener('visibilitychange',()=>{if(document.hidden&&active){paused=true;refresh();say('Пауза: вкладка неактивна.');}});
   refresh();say('Разместите башни на площадках и защитите крепость.');
-  window.__TDEF_GAME__={startWave,enterBattle,getState:()=>({gold,baseHealth,wave,kills,enemies:enemies.length,towers:towers.length})};
+  window.__TDEF_GAME__={startWave,enterBattle,getState:()=>({gold,baseHealth,wave,kills,enemies:enemies.length,towers:towers.length,spawnQueue:spawnQueue.length}),debugSpawn:spawnEnemy};
 }
