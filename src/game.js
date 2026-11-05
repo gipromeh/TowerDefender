@@ -31,7 +31,7 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
     targetPriority:$('targetPriority'),branchPanel:$('branchPanel'),
     branchA:$('branchA'),branchB:$('branchB'),wavePreview:$('wavePreview'),
     frost:$('frostSpell'),meteor:$('meteorSpell'),spellStatus:$('spellStatus'),
-    campaign:$('campaignStatus'),achievement:$('achievementStatus'),victory:$('victoryScreen'),victoryNext:$('nextMap'),victoryStats:$('victoryStats')
+    campaign:$('campaignStatus'),achievement:$('achievementStatus'),victory:$('victoryScreen'),victoryNext:$('nextMap'),victoryStats:$('victoryStats'),defeat:$('defeatScreen'),restart:$('restartGame')
   };
   const path=curve.map(p=>p.clone()), lengths=[0];
   for(let i=1;i<path.length;i++)lengths.push(lengths[i-1]+B.Vector3.Distance(path[i-1],path[i]));
@@ -334,7 +334,7 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
     enemy.mesh.dispose();enemy.barBack.dispose();enemy.barFill.dispose();
     if(!reachedBase)spawnBurst(deathPoint,'goblin');
     const i=enemies.indexOf(enemy);if(i>=0)enemies.splice(i,1);
-    if(reachedBase){baseHealth=Math.max(0,baseHealth-enemy.baseDamage);spawnBurst(deathPoint,'base');if(baseHealth===0){gameOver=true;active=false;say('Поражение: база уничтожена.');}}
+    if(reachedBase){baseHealth=Math.max(0,baseHealth-enemy.baseDamage);spawnBurst(deathPoint,'base');if(baseHealth===0){gameOver=true;active=false;if(ui.defeat)ui.defeat.hidden=false;say('Поражение: база уничтожена.');}}
     else{
       gold+=enemy.reward;kills++;
       const newly=[];
@@ -569,6 +569,7 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
   if(ui.frost)ui.frost.addEventListener('click',castFrost);
   if(ui.meteor)ui.meteor.addEventListener('click',castMeteor);
   if(ui.victoryNext)ui.victoryNext.addEventListener('click',()=>{if(selectedMap<2){location.href=location.pathname+'?map='+(selectedMap+1);}});
+  if(ui.restart)ui.restart.addEventListener('click',()=>{location.href=location.pathname+'?map='+selectedMap;});
   if(ui.campaign)ui.campaign.textContent='Кампания · карта '+(selectedMap+1)+' · 0/'+maxCampaignWaves;
   scene.onBeforeRenderObservable.add(()=>update(Math.min(engine.getDeltaTime()/1000,.05)));
   document.addEventListener('visibilitychange',()=>{if(document.hidden&&active){paused=true;refresh();say('Пауза: вкладка неактивна.');}});
