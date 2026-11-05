@@ -38,7 +38,7 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
   const pathLength=lengths.at(-1), enemies=[],towers=[],projectiles=[],effects=[];
   let gold=CONFIG.startingGold,baseHealth=CONFIG.baseHealth,wave=0,kills=0;
   let spawnLeft=0,spawnTimer=0,active=false,paused=false,speed=1,selectedPad=-1,gameOver=false,started=false,intermissionLeft=0,intermissionShown=0,countdownLeft=0,countdownShown=0;
-  let spawnQueue=[],frostCooldown=0,meteorCooldown=0,frostTime=0,selectedMap=Number(new URLSearchParams(location.search).get('map')||0);
+  let spawnQueue=[],frostCooldown=0,meteorCooldown=0,frostTime=0,selectedMap=Math.max(0,Math.min(2,Number(localStorage.getItem('tdefUnlockedMap')||0),Number(new URLSearchParams(location.search).get('map')||0)||0));
   const maxCampaignWaves=CONFIG.campaignWaves,unlockedMap=Number(localStorage.getItem('tdefUnlockedMap')||0);
   const mapNames=['Зелёные холмы','Северный перевал','Затонувшие руины'];
   const achievements=JSON.parse(localStorage.getItem('tdefAchievements')||'[]');
