@@ -247,6 +247,12 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
     if(w%5===0)queue.splice(Math.floor(queue.length*.55),0,'boss');
     return queue;
   }
+  function updateWavePreview(w){
+    if(!ui.wavePreview)return;
+    const composition=waveComposition(w);
+    const counts=composition.reduce((acc,type)=>(acc[type]=(acc[type]||0)+1,acc),{});
+    ui.wavePreview.textContent='Следующая волна '+w+': '+Object.entries(counts).map(([type,count])=>(type==='boss'?'Босс':ENEMY_TYPES[type].name)+' ×'+count).join(' · ');
+  }
   function spawnEnemy(type='goblin'){
     const boss=type==='boss',baseType=boss?'troll':type,def=ENEMY_TYPES[baseType]||ENEMY_TYPES.goblin;
     const id=kills+enemies.length+wave*100,root=new B.TransformNode('enemy_'+baseType+'_'+id,scene);
@@ -474,7 +480,7 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
         if(ui.victoryNext){ui.victoryNext.disabled=next<=selectedMap;ui.victoryNext.textContent=next<=selectedMap?'Кампания завершена':'Открыта следующая карта · перейти';}
         say('Победа! Кампания на этой карте завершена.');
       }else{
-        intermissionLeft=5;intermissionShown=5;beginCountdown(5,'Следующая волна');
+        intermissionLeft=5;intermissionShown=5;updateWavePreview(wave+1);beginCountdown(5,'Следующая волна');
         say('Волна '+wave+' отражена. Награда: '+(25+8*wave)+'.');
       }
       refresh();
@@ -493,7 +499,7 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
     if(active||gameOver)return;
     started=true;intermissionLeft=0;intermissionShown=0;hideCountdown();hideMenu();
     wave++;spawnQueue=waveComposition(wave);spawnLeft=spawnQueue.length;spawnTimer=0;active=true;paused=false;
-    if(ui.wavePreview)ui.wavePreview.textContent='Волна '+wave+': '+Object.entries(spawnQueue.reduce((a,t)=>(a[t]=(a[t]||0)+1,a),{})).map(([t,n])=>(ENEMY_TYPES[t]?.name||'Босс')+' ×'+n).join(' · ');
+    updateWavePreview(wave);
     spawnBurst(pointAt(0),'spawn');
     say('Волна '+wave+': гоблины идут к крепости!');refresh();
   }
@@ -543,6 +549,6 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
   if(ui.campaign)ui.campaign.textContent='Кампания · карта '+(selectedMap+1)+' · 0/'+maxCampaignWaves;
   scene.onBeforeRenderObservable.add(()=>update(Math.min(engine.getDeltaTime()/1000,.05)));
   document.addEventListener('visibilitychange',()=>{if(document.hidden&&active){paused=true;refresh();say('Пауза: вкладка неактивна.');}});
-  refresh();say('Разместите башни на площадках и защитите крепость.');
+  refresh();updateWavePreview(1);say('Разместите башни на площадках и защитите крепость.');
   window.__TDEF_GAME__={startWave,enterBattle,getState:()=>({gold,baseHealth,wave,kills,enemies:enemies.length,towers:towers.length,spawnQueue:spawnQueue.length}),debugSpawn:spawnEnemy};
 }
