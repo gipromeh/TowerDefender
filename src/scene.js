@@ -59,7 +59,8 @@ for(let i=0;i<34;i++){
 }
 
 // Winding road from spawn to castle.
-const mapId=Math.max(0,Math.min(2,Number(new URLSearchParams(location.search).get('map')||0)));
+const maxUnlockedMap=Math.max(0,Math.min(2,Number(localStorage.getItem('tdefUnlockedMap')||0)));
+const mapId=Math.max(0,Math.min(maxUnlockedMap,2,Number(new URLSearchParams(location.search).get('map')||0)));
 const routePoints=[
  [
   [-15,0.17,4.9],[-11.4,0.17,4.7],[-8.4,0.17,2.9],[-7.8,0.17,-0.1],
@@ -217,7 +218,7 @@ engine.runRenderLoop(()=>scene.render());
 window.addEventListener('resize',()=>{engine.resize();resizeCamera();});
 const mapSelect=document.getElementById('mapSelect');
 if(mapSelect){
- const unlocked=Math.max(0,Math.min(2,Number(localStorage.getItem('tdefUnlockedMap')||0)));
+ const unlocked=maxUnlockedMap;
  [...mapSelect.options].forEach(option=>{option.disabled=Number(option.value)>unlocked;});
  mapSelect.value=String(mapId);
  mapSelect.addEventListener('change',()=>{location.href=location.pathname+'?map='+mapSelect.value;});
