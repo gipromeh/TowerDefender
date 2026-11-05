@@ -309,7 +309,7 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
       aura.parent=root;aura.position.y=.18;aura.material=eye;aura.isPickable=false;
     }
     const p=pointAt(0);root.position.set(p.x,def.flying?1.7:.18,p.z);
-    root.scaling.setAll(scale);
+    root.scaling.setAll(1);
     const back=B.MeshBuilder.CreateBox('enemyHealthBack'+id,{width:boss?1.7:.95,height:.1,depth:.07},scene);
     const fill=B.MeshBuilder.CreateBox('enemyHealthFill'+id,{width:boss?1.66:.91,height:.075,depth:.08},scene);
     back.material=enemyHealthBackMat;fill.material=boss?enemyBossHealthMat:enemyHealthFillMat;back.isPickable=fill.isPickable=false;
@@ -527,6 +527,10 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
     if(t.type==='mortar'&&branch==='siege'){t.damage*=1.65;t.reload*=1.45;t.range*=1.2;t.splash=1.8;}
     if(t.type==='magic'&&branch==='storm'){t.damage*=.82;}
     if(t.type==='magic'&&branch==='frost'){t.damage*=.9;}
+    if(t.type==='mortar'||t.type==='gunner'){
+      t.ring.dispose();
+      t.ring=mesh(t.root,'rangeRingSpecial_'+t.index,'torus',{diameter:t.range*2,thickness:.025,tessellation:72},material('rangeSpecial_'+t.index,TOWERS[t.type].color,true,.25),[0,.035,0]);
+    }
     if(ui.branchPanel)ui.branchPanel.hidden=true;
     say('Специализация башни установлена.');refresh();openMenu(selectedPad);
   }
