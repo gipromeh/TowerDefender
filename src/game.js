@@ -196,7 +196,7 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
         ui.branchA.textContent=tower.type==='gunner'?'Шквальный огонь':tower.type==='mortar'?'Осколочный заряд':'Цепная молния';
         ui.branchB.textContent=tower.type==='gunner'?'Снайперский ствол':tower.type==='mortar'?'Осадный заряд':'Ледяная печать';
       }
-      ui.menuInfo.textContent='Урон '+Math.round(def.damage*(1+.5*(tower.level-1)))+' · дальность '+(def.range*(1+.1*(tower.level-1))).toFixed(1);
+      ui.menuInfo.textContent='Урон '+Math.round(tower.damage??def.damage)+' · дальность '+(tower.range??def.range).toFixed(1)+(tower.branch?' · специализация '+tower.branch:'');
       ui.upgrade.textContent=tower.level>=3?'Максимальный уровень':'Улучшить · '+upgradeCost;
       ui.upgrade.disabled=tower.level>=3||gold<upgradeCost;
       ui.sell.textContent='Продать · '+Math.floor(tower.invested*CONFIG.sellRate);
