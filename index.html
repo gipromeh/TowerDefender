@@ -30,6 +30,19 @@ html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#17221c;fon
 .introRule b{display:block;margin-bottom:5px;color:#e7c87d;font-size:13px}
 #enterBattle{min-height:50px;width:min(300px,100%);border:1px solid #f0d18b;border-radius:10px;background:linear-gradient(#b58b42,#78562b);color:#fff8e8;font-size:15px;font-weight:800;letter-spacing:.08em;box-shadow:0 5px 20px #0005;cursor:pointer}
 #enterBattle:active{transform:translateY(1px)}
+#mapPicker{display:flex;align-items:center;justify-content:center;gap:10px;margin:0 auto 16px;color:#e8dfcc;font-size:13px}
+#mapSelect{min-height:38px;max-width:240px;border:1px solid #b99a68;border-radius:8px;background:#26382f;color:#fff4dc;padding:6px 10px}
+#gameHud .spellRow{grid-column:1/-1;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+#gameHud .spellRow button{flex:1;min-width:100px;background:#35445b;border-color:#8aadd0}
+#campaignStatus,#wavePreview,#spellStatus{grid-column:1/-1;color:#e7d4a7;font-size:11px;line-height:1.4}
+#branchPanel{display:flex;gap:8px;margin-top:8px}
+#branchPanel[hidden]{display:none}
+#branchPanel button{flex:1;min-height:40px;border:1px solid #d0ad69;border-radius:8px;background:#4b4934;color:#fff2d2;font-weight:700}
+#targetPriority{width:100%;min-height:36px;margin:0 0 8px;border:1px solid #9aab9c;border-radius:7px;background:#29392f;color:#fff4dc;padding:5px}
+#victoryScreen{position:fixed;z-index:45;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;background:#07100adf;color:#fff3d2;text-align:center}
+#victoryScreen[hidden]{display:none}
+.victoryCard{width:min(480px,100%);padding:30px;border:1px solid #d5b77b;border-radius:16px;background:#1d2c23;box-shadow:0 15px 60px #0009}
+#nextMap{min-height:44px;margin-top:18px;padding:8px 16px;border:1px solid #f0d18b;border-radius:9px;background:#98713b;color:#fff8e8;font-weight:800}
 #introFoot{margin-top:13px;color:#9eaa9e;font-size:10px;letter-spacing:.06em}
 #waveCountdown{position:fixed;z-index:25;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;background:#07100a40;color:#fff3d2;text-shadow:0 5px 24px #000;backdrop-filter:blur(2px)}
 #countdownValue{font-size:clamp(100px,25vw,220px);font-weight:900;line-height:.9;color:#f3d58c;text-shadow:0 0 35px #d99c3b88,0 8px 30px #000}
@@ -54,7 +67,7 @@ html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#17221c;fon
 <div id="loading"><div class="message"><strong>Загрузка 3D-сцены…</strong>Инициализация Babylon.js.</div></div>
 <div id="error"><div class="message"><strong id="errorTitle">Ошибка сцены</strong><span id="errorText"></span></div></div>
 <div id="rotate"><div class="message"><strong>↻ Поверните устройство горизонтально</strong><br>Сцена рассчитана на альбомную ориентацию.</div></div>
-<section id="introScreen" aria-label="Вступление к игре"><div class="introCard"><div class="introKicker">Тактическая оборона</div><h1 class="introTitle">TOWER DEFENDER</h1><p class="introLead">Враги идут к крепости по дороге. Постройте оборону, комбинируйте орудия и не дайте противнику прорваться к воротам.</p><div class="introRules"><div class="introRule"><b>01 · Стройте</b>Нажмите на свободную площадку и выберите тип башни.</div><div class="introRule"><b>02 · Усиливайте</b>Улучшайте башни: растут мощность и сама конструкция.</div><div class="introRule"><b>03 · Защищайте</b>Зарабатывайте золото за уничтоженных врагов и отражённые волны.</div></div><button id="enterBattle" type="button">НАЧАТЬ ОБОРОНУ</button><div id="introFoot">ПЕРВАЯ ВОЛНА НАЧНЁТСЯ ЧЕРЕЗ 3 СЕКУНДЫ</div></div></section>
+<section id="introScreen" aria-label="Вступление к игре"><div class="introCard"><div class="introKicker">Тактическая оборона</div><h1 class="introTitle">TOWER DEFENDER</h1><p class="introLead">Враги идут к крепости по дороге. Постройте оборону, комбинируйте орудия и не дайте противнику прорваться к воротам.</p><div class="introRules"><div class="introRule"><b>01 · Стройте</b>Нажмите на свободную площадку и выберите тип башни.</div><div class="introRule"><b>02 · Усиливайте</b>Улучшайте башни: растут мощность и сама конструкция.</div><div class="introRule"><b>03 · Защищайте</b>Зарабатывайте золото за уничтоженных врагов и отражённые волны.</div></div><label id="mapPicker">Карта <select id="mapSelect"><option value="0">Зелёные холмы</option><option value="1">Северный перевал</option><option value="2">Затонувшие руины</option></select></label><button id="enterBattle" type="button">НАЧАТЬ ОБОРОНУ</button><div id="introFoot">ПЕРВАЯ ВОЛНА НАЧНЁТСЯ ЧЕРЕЗ 3 СЕКУНДЫ</div></div></section>
 <div id="waveCountdown" hidden aria-live="assertive"><div id="countdownValue">3</div><div id="countdownLabel">Первая волна</div></div>\n<details id="gameHud" aria-label="Панель игры">
 <summary><span class="stats"><span>Золото <strong id="goldValue">100</strong></span><span>База <strong id="baseValue">20</strong></span><span>Волна <strong id="waveValue">0</strong></span><span>Убийства <strong id="killsValue">0</strong></span></span></summary>
 <div class="controls">
@@ -63,12 +76,17 @@ html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#17221c;fon
 <label for="gameSpeed">Скорость</label>
 <select id="gameSpeed"><option value="1">×1</option><option value="2">×2</option><option value="3">×3</option></select>
 <span>Площадка: <strong id="selectedPad">—</strong></span>
+<div class="spellRow"><button id="frostSpell" type="button">Ледяная буря</button><button id="meteorSpell" type="button">Метеорит</button></div>
+<div id="spellStatus">Ледяная буря готова · Метеор готов</div>
+<div id="campaignStatus">Кампания · карта 1 · 0/10</div>
+<div id="wavePreview">Состав следующей волны появится перед началом.</div>
 <div id="gameMessage" role="status" aria-live="polite">Нажмите на площадку, чтобы выбрать башню.</div>
 </div>
 </details>
 <section id="contextMenu" hidden aria-label="Действия с башней или площадкой">
 <div class="contextHead"><div id="contextTitle">Площадка</div><button id="closeContext" type="button" aria-label="Закрыть">×</button></div>
 <div id="contextInfo">Выберите тип башни</div>
+<select id="targetPriority" aria-label="Приоритет цели"><option value="first">Цель: первая на пути</option><option value="last">Цель: последняя на пути</option><option value="strongest">Цель: с наибольшим здоровьем</option><option value="weakest">Цель: с наименьшим здоровьем</option></select>
 <div class="contextGrid" id="buildOptions">
 <button type="button" data-build="gunner"><img class="weaponIcon" src="./icons/gunner.svg" alt=""><span>Пулемёт</span><small data-price>50 золота</small></button>
 <button type="button" data-build="mortar"><img class="weaponIcon" src="./icons/mortar.svg" alt=""><span>Мортира</span><small data-price>100 золота</small></button>
@@ -78,7 +96,9 @@ html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#17221c;fon
 <button id="upgradeTower" type="button">Улучшить</button>
 <button id="sellTower" class="sell" type="button">Продать</button>
 </div>
+<div id="branchPanel" hidden><button id="branchA" type="button">Специализация A</button><button id="branchB" type="button">Специализация B</button></div>
 </section>
+<section id="victoryScreen" hidden><div class="victoryCard"><div class="introKicker">Кампания пройдена</div><h2>ПОБЕДА!</h2><p>Крепость удержана. Следующий регион открыт.</p><button id="nextMap" type="button">Перейти к следующей карте</button></div></section>
 <canvas id="renderCanvas"></canvas>
 <script type="module" src="./src/main.js"></script>
 </body>
