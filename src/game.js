@@ -41,7 +41,10 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
   let spawnQueue=[],frostCooldown=0,meteorCooldown=0,frostTime=0,selectedMap=Number(new URLSearchParams(location.search).get('map')||0);
   const maxCampaignWaves=CONFIG.campaignWaves,unlockedMap=Number(localStorage.getItem('tdefUnlockedMap')||0);
   const spellState={frost:0,meteor:0};
-  const materials={},visualAnimations=[];
+  const materials={},visualAnimations=[],enemyVisuals={};
+  const enemyHealthBackMat=material('enemyHealthBackMat','#351e1e');
+  const enemyHealthFillMat=material('enemyHealthFillMat','#68d36e');
+  const enemyBossHealthMat=material('enemyBossHealthMat','#f04b55');
   function material(name,color,emissive=false,alpha=1){
     const m=new B.StandardMaterial(name,scene);m.diffuseColor=B.Color3.FromHexString(color);
     if(emissive)m.emissiveColor=B.Color3.FromHexString(color);m.alpha=alpha;materials[name]=m;return m;
@@ -251,10 +254,17 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
       const m=kind==='sphere'?B.MeshBuilder.CreateSphere(name,opts,scene):kind==='box'?B.MeshBuilder.CreateBox(name,opts,scene):B.MeshBuilder.CreateCylinder(name,opts,scene);
       m.parent=root;m.position.set(...pos);m.material=mat;m.isPickable=false;return m;
     };
-    const skin=material('enemySkin_'+id,def.color,boss);
-    const dark=material('enemyDark_'+id,boss?'#292b36':'#35432f');
-    const cloth=material('enemyCloth_'+id,boss?'#6d2634':baseType==='orc'?'#65462f':'#75412f');
-    const eye=material('enemyEye_'+id,boss?'#ffb24a':'#f1d66b',true);
+    const paletteKey=boss?'boss':baseType;
+    if(!enemyVisuals[paletteKey]){
+      enemyVisuals[paletteKey]={
+        skin:material('enemySkin_'+paletteKey,boss?'#a85d45':def.color,boss),
+        dark:material('enemyDark_'+paletteKey,boss?'#292b36':baseType==='orc'?'#40352d':'#35432f'),
+        cloth:material('enemyCloth_'+paletteKey,boss?'#6d2634':baseType==='orc'?'#65462f':baseType==='shaman'?'#514078':'#75412f'),
+        eye:material('enemyEye_'+paletteKey,boss?'#ffb24a':'#f1d66b',true),
+        wing:material('enemyWing_'+paletteKey,'#6e587d')
+      };
+    }
+    const {skin,dark,cloth,eye,wing}=enemyVisuals[paletteKey];
     const scale=boss?1.75:baseType==='troll'?1.35:baseType==='flyer'?.82:baseType==='orc'?1.18:1;
     part('enemyTorso'+id,'sphere',{diameter:1,segments:10},cloth,[0,.55,0]).scaling.set(.5*scale,.6*scale,.36*scale);
     part('enemyBelly'+id,'sphere',{diameter:.55,segments:8},skin,[0,.57*scale,.22*scale]).scaling.set(.8*scale,.8*scale,.55*scale);
@@ -283,9 +293,8 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
       part('enemyClub'+id,'cylinder',{diameter:.14,height:.72,tessellation:7},dark,[.52,.65,.12]).rotation.z=-.5;
     }
     if(def.flying){
-      const wingMat=material('enemyWing_'+id,'#6e587d');
       for(const side of [-1,1]){
-        const wing=part('enemyWing'+id+'_'+side,'box',{width:.72,height:.08,depth:.42},wingMat,[side*.48,.92,-.08]);
+        const wingMesh=part('enemyWing'+id+'_'+side,'box',{width:.72,height:.08,depth:.42},wing,[side*.48,.92,-.08]);
         wing.rotation.z=side*.45;
       }
     }
@@ -297,8 +306,7 @@ export function attachGame({B:Babylon,scene,engine,curve,pads}) {
     root.scaling.setAll(scale);
     const back=B.MeshBuilder.CreateBox('enemyHealthBack'+id,{width:boss?1.7:.95,height:.1,depth:.07},scene);
     const fill=B.MeshBuilder.CreateBox('enemyHealthFill'+id,{width:boss?1.66:.91,height:.075,depth:.08},scene);
-    const backMat=material('enemyBack'+id,'#351e1e'),fillMat=material('enemyFill'+id,boss?'#f04b55':'#68d36e');
-    back.material=backMat;fill.material=fillMat;back.isPickable=fill.isPickable=false;
+    back.material=enemyHealthBackMat;fill.material=boss?enemyBossHealthMat:enemyHealthFillMat;back.isPickable=fill.isPickable=false;
     const hp=def.hp*(1+wave*.12)*(boss?4.5:1);
     const enemy={mesh:root,barBack:back,barFill:fill,legs,hp,maxHp:hp,distance:0,dead:false,phase:Math.random()*Math.PI*2,type:baseType,boss,flying:!!def.flying,armor:def.armor||0,regen:def.regen||0,heal:def.healer||false,healTimer:1.5,speed:def.speed*(1+wave*.012),baseDamage:def.damage,reward:def.reward*(boss?5:1),slow:0,scale};
     enemies.push(enemy);
